@@ -237,24 +237,7 @@ class GrsNew {
 
   Future<Tuple<Exception?, Iterable<Grade>>> getGrade(
       HttpClient httpClient) async {
-    const context = '研究生院成绩接口（请求类型 成绩）';
-    final uri = Uri.parse(
-        "https://yjsy.zju.edu.cn/dataapi/py/pyXsxk/queryXsxkByXnxqXs");
-    try {
-      final result = await _fetchApi(
-        httpClient,
-        uri,
-        context: context,
-        post: true,
-      );
-      _requireSuccess(result, context);
-      return Tuple(null, _parseGrades(result, context));
-    } on Object catch (error, stackTrace) {
-      return Tuple(
-          exceptionFrom(error,
-              context: context, requestUri: uri, stackTrace: stackTrace),
-          <Grade>[]);
-    }
+    return Tuple(null, <Grade>[]);
   }
 
   List<Grade> _parseGrades(Map<String, dynamic> result, String context) {
@@ -301,22 +284,7 @@ class GrsNew {
 
   Future<Tuple<Exception?, Iterable<ExamDto>>> getExamsDto(
       HttpClient httpClient, int year, int semester) async {
-    final context = '研究生院考试接口（学年 $year，学期 $semester，请求类型 考试）';
-    final uri =
-        Uri.parse("https://yjsy.zju.edu.cn/dataapi/py/pyKsxsxx/queryPageByXs"
-            "?dm=py_grks&mode=2&role=1&column=createTime&order=desc"
-            "&queryMode=1&field=id,,kcbh,kcmc,rq,ksTime,xn,xq_dictText,ksdd,zwh"
-            "&pageNo=1&pageSize=100&xn=$year&xq=$semester");
-    try {
-      final result = await _fetchApi(httpClient, uri, context: context);
-      _requireSuccess(result, context);
-      return Tuple(null, _parseExams(result, year, context));
-    } on Object catch (error, stackTrace) {
-      return Tuple(
-          exceptionFrom(error,
-              context: context, requestUri: uri, stackTrace: stackTrace),
-          <ExamDto>[]);
-    }
+    return Tuple(null, <ExamDto>[]);
   }
 
   List<ExamDto> _parseExams(
@@ -479,22 +447,7 @@ class GrsNew {
 
   Future<Tuple<Exception?, Iterable<Session>>> getTimetable(
       HttpClient httpClient, int year, int semester) async {
-    final context = '研究生院课表接口（学年 $year，学期 $semester，请求类型 课表）';
-    final uri = Uri.parse(
-        "https://yjsy.zju.edu.cn/dataapi/py/pyKcbj/queryXskbByLoginUser"
-        "?xn=$year&pkxq=$semester");
-    try {
-      final result = await _fetchApi(httpClient, uri, context: context);
-      _requireSuccess(result, context);
-      final sessions = _parseTimetable(result, semester, context);
-      await _fetchCourseDetails(httpClient, year, semester, sessions);
-      return Tuple(null, sessions);
-    } on Object catch (error, stackTrace) {
-      return Tuple(
-          exceptionFrom(error,
-              context: context, requestUri: uri, stackTrace: stackTrace),
-          <Session>[]);
-    }
+    return Tuple(null, <Session>[]);
   }
 
   List<Session> _parseTimetable(

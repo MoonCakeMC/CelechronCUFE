@@ -78,16 +78,17 @@ class Session {
       var nameTeacherPosition = RegExp(r'(.*?)<br>(.*?)<br>(.*?)<br>(.*?)zwf')
           .firstMatch(courseBlock);
       if (nameTeacherPosition != null) {
-        // ZDBK上，课程名称中的括号有时会变成英文括号，此处统一改成中文括号
-        session.name = nameTeacherPosition
-            .group(1)!
-            .replaceAll('(', '（')
-            .replaceAll(')', '）');
+        session.name = nameTeacherPosition.group(1)!.replaceAll('(', '（').replaceAll(')', '）');
         session.teacher = nameTeacherPosition.group(3) ?? '未知教师';
-        session.location = nameTeacherPosition.group(4) == ''
-            ? null
-            : nameTeacherPosition.group(4);
+        session.location = nameTeacherPosition.group(4) == '' ? null : nameTeacherPosition.group(4);
       }
+    }
+    
+    // 如果 kcb 解析失败（中财可能不返回 kcb HTML块），回退到原始字段
+    if (session.name == '未知课程') {
+      session.name = (asString(json['kcmc']) ?? '未知课程').replaceAll('(', '（').replaceAll(')', '）');
+      session.teacher = asString(json['xm']) ?? asString(json['jsxm']) ?? '未知教师';
+      session.location = asString(json['cdmc']);
     }
     // 短学期 or 长学期
     final semester = asString(json['xxq']);

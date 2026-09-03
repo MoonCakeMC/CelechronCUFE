@@ -74,9 +74,9 @@ class Grade {
 
   // 从所有成绩查询处爬取，因此不含主修标记
   factory Grade(Map<String, dynamic> json) {
-    final id = asString(json['xkkh']);
+    final id = asString(json['xkkh']) ?? asString(json['kch_id']);
     if (id == null || id.isEmpty) {
-      throw const FormatException('成绩缺少选课课号 xkkh');
+      throw const FormatException('成绩缺少选课课号(xkkh)或课程号(kch_id)');
     }
     final grade = Grade.empty()
       ..id = id

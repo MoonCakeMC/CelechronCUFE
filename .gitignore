@@ -888,3 +888,15 @@ DerivedData/
 !**/ios/**/default.pbxuser
 !**/ios/**/default.perspectivev3
 !/packages/flutter_tools/test/data/dart_dependencies_test/**/.packages
+
+test/*
+*.har
+*.saz
+test_*
+all_har_urls.txt
+bjkb.txt
+get_info.py
+get_sso.py
+local_login_res.html
+encrypt.js
+parse_bjkb.py

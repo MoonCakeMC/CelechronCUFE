@@ -26,9 +26,9 @@ class ExamDto {
   }*/
 
   factory ExamDto.fromZdbk(Map<String, dynamic> json) {
-    final id = asString(json['xkkh']);
+    final id = asString(json['xkkh']) ?? asString(json['kch_id']);
     if (id == null || id.isEmpty) {
-      throw const FormatException('考试条目缺少选课课号 xkkh');
+      throw const FormatException('考试条目缺少选课课号(xkkh)或课程号(kch_id)');
     }
     final dto = ExamDto.empty()
       ..id = id

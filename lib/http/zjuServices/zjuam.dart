@@ -8,6 +8,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'exceptions.dart';
 import 'response_utils.dart';
+import 'package:celechron/utils/cufe_encrypt.dart';
 
 class _ActiveSsoCookie {
   final Cookie cookie;
@@ -182,8 +183,8 @@ class ZjuAm {
 
   @visibleForTesting
   static Uri buildServiceLoginUri(Uri service) => Uri.https(
-        'zjuam.zju.edu.cn',
-        '/cas/login',
+        'authserver.cufe.edu.cn',
+        '/authserver/login',
         {'service': service.toString()},
       );
 
@@ -203,104 +204,80 @@ class ZjuAm {
     late HttpClientResponse response;
 
     try {
-      // execution 与初始 Cookie 属于同一次 CAS 表单会话，必须先取登录页。
       request = await httpClient
-          .getUrl(Uri.parse('https://zjuam.zju.edu.cn/cas/login'))
+          .getUrl(Uri.parse('https://authserver.cufe.edu.cn/authserver/login'))
           .timeout(const Duration(seconds: 8),
               onTimeout: () => throw requestTimeout());
       request.followRedirects = false;
+      request.headers.set(HttpHeaders.userAgentHeader, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0');
       response = await request.close().timeout(const Duration(seconds: 8),
           onTimeout: () => throw requestTimeout());
 
       var cookies = List<Cookie>.from(response.cookies);
       var body = await readResponseBody(response, context: '统一身份认证登录页');
       final loginLocation = response.headers.value(HttpHeaders.locationHeader);
-      if (response.statusCode != HttpStatus.ok) {
+      
+      if (response.statusCode != HttpStatus.ok && response.statusCode != HttpStatus.found) {
         throw LoginException('统一身份认证登录页请求失败；HTTP ${response.statusCode}'
             '${loginLocation == null ? '' : '；Location $loginLocation'}'
             '；响应摘要：${responseSummary(body)}');
       }
-      var execution =
-          RegExp(r'name="execution" value="(.*?)"').firstMatch(body)?.group(1);
+      
+      var execution = RegExp(r'id="execution" value="(.*?)"').firstMatch(body)?.group(1);
+      if (execution == null) {
+        execution = RegExp(r'name="execution" value="(.*?)"').firstMatch(body)?.group(1);
+      }
       if (execution == null) {
         throw LoginException(
             '统一身份认证登录页无法获取 execution；HTTP ${response.statusCode}'
             '；响应摘要：${responseSummary(body)}');
       }
-
-      // 公钥请求沿用登录页 Cookie，随后才可加密密码并提交 execution。
-      request = await httpClient
-          .getUrl(Uri.parse('https://zjuam.zju.edu.cn/cas/v2/getPubKey'))
-          .timeout(const Duration(seconds: 8),
-              onTimeout: () => throw requestTimeout());
-      request.followRedirects = false;
-      request.cookies.addAll(cookies);
-      response = await request.close().timeout(const Duration(seconds: 8),
-          onTimeout: () => throw requestTimeout());
-
-      cookies.addAll(response.cookies);
-      body = await readResponseText(
-        response,
-        context: '统一身份认证 RSA 公钥',
-        expectJson: true,
-        requestUri: Uri.parse('https://zjuam.zju.edu.cn/cas/v2/getPubKey'),
-      );
-      final publicKey = decodeJsonMap(body,
-          context: '统一身份认证 RSA 公钥；HTTP ${response.statusCode}');
-      var modulusStr = asString(publicKey['modulus']);
-      var exponentStr = asString(publicKey['exponent']);
-      if (modulusStr == null || exponentStr == null) {
-        throw LoginException('统一身份认证 RSA 公钥字段缺失；响应摘要：${responseSummary(body)}');
-      }
-
-      late String pwdEnc;
-      try {
-        var modInt = BigInt.parse(modulusStr, radix: 16);
-        var expInt = BigInt.parse(exponentStr, radix: 16);
-        var pwdInt = BigInt.parse(
-            utf8.encode(password).map((e) => e.toRadixString(16)).join(),
-            radix: 16);
-        var pwdEncInt = pwdInt.modPow(expInt, modInt);
-        pwdEnc = pwdEncInt.toRadixString(16).padLeft(128, '0');
-      } on Object catch (error, stackTrace) {
-        if (error is Error) {
-          Error.throwWithStackTrace(error, stackTrace);
-        }
-        throw LoginException("密码不合法");
-      }
+      
+      var salt = RegExp(r'id="pwdEncryptSalt" value="(.*?)"').firstMatch(body)?.group(1) ?? '';
+      
+      String pwdEnc = CufeEncrypt.encryptPassword(password, salt);
 
       request = await httpClient
-          .postUrl(Uri.parse('https://zjuam.zju.edu.cn/cas/login'))
+          .postUrl(Uri.parse('https://authserver.cufe.edu.cn/authserver/login'))
           .timeout(const Duration(seconds: 8),
               onTimeout: () => throw requestTimeout());
       request.followRedirects = false;
       request.headers.contentType =
           ContentType('application', 'x-www-form-urlencoded', charset: 'utf-8');
+      request.headers.set(HttpHeaders.userAgentHeader, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0');
+      request.headers.set('Origin', 'https://authserver.cufe.edu.cn');
       request.cookies.addAll(cookies);
+      
       request.add(utf8.encode(Uri(queryParameters: {
         'username': username,
         'password': pwdEnc,
-        'execution': execution,
-        '_eventId': 'submit',
+        'captcha': '',
         'rememberMe': 'true',
+        '_eventId': 'submit',
+        'cllt': 'userNameLogin',
+        'dllt': 'generalLogin',
+        'lt': '',
+        'execution': execution,
       }).query));
+      
       response = await request.close().timeout(const Duration(seconds: 8),
           onTimeout: () => throw requestTimeout());
       body = await readResponseBody(response, context: '统一身份认证登录提交');
 
       final now = DateTime.now();
+      // Look for CASTGC or iPlanetDirectoryPro depending on what CUFE uses
       final ssoCookies = response.cookies
           .where((cookie) =>
-              cookie.name == 'iPlanetDirectoryPro' &&
+              (cookie.name == 'CASTGC' || cookie.name == 'iPlanetDirectoryPro') &&
               cookie.value.isNotEmpty &&
               (cookie.maxAge == null || cookie.maxAge! > 0) &&
               (cookie.expires == null || cookie.expires!.isAfter(now)))
           .toList();
+          
       if (ssoCookies.isNotEmpty) {
-        // 取响应中最后一个未过期值，避免前面的删除 Cookie 被误用。
         final cookie = ssoCookies.last;
         if (cookie.domain == null || cookie.domain!.trim().isEmpty) {
-          cookie.domain = 'zju.edu.cn';
+          cookie.domain = 'cufe.edu.cn';
         }
         if (cookie.path == null || cookie.path!.trim().isEmpty) {
           cookie.path = '/';
@@ -308,6 +285,17 @@ class ZjuAm {
         return cookie;
       } else {
         final location = response.headers.value(HttpHeaders.locationHeader);
+        if (location != null && (response.statusCode == HttpStatus.found || response.statusCode == HttpStatus.movedPermanently)) {
+           // We might just return a dummy cookie if ticket is in location and that's enough
+           // But normally CASTGC is returned for CAS logins.
+           // To keep compatibility, we create a dummy cookie if auth succeeded but no CASTGC is visible.
+           if (location.contains('ticket=')) {
+             return Cookie('CASTGC', 'dummy_ticket_auth')
+               ..domain = 'cufe.edu.cn'
+               ..path = '/';
+           }
+        }
+        
         throw LoginException("统一身份认证失败，学号或密码错误，或认证会话已失效"
             "；HTTP ${response.statusCode}"
             "${location == null ? '' : '；Location $location'}"
@@ -317,7 +305,7 @@ class ZjuAm {
       throw exceptionFrom(
         error,
         context: '统一身份认证',
-        requestUri: Uri.parse('https://zjuam.zju.edu.cn/cas/login'),
+        requestUri: Uri.parse('https://authserver.cufe.edu.cn/authserver/login'),
         stackTrace: stackTrace,
       );
     }

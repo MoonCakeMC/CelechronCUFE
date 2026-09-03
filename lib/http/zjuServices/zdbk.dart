@@ -55,70 +55,65 @@ class Zdbk {
 
   Future<bool> _doLogin(
       HttpClient httpClient, Cookie iPlanetDirectoryPro) async {
-    late HttpClientRequest request;
-    late HttpClientResponse response;
-
     _captcha = null;
     _jSessionId = null;
     _route = null;
-    // 第一步用统一认证 Cookie 换取 service 跳转；第二步访问跳转地址，
-    // 业务站才会签发必须成对使用的 JSESSIONID 与 route。
-    request = await httpClient
-        .getUrl(Uri.parse(
-            "https://zjuam.zju.edu.cn/cas/login?service=https%3A%2F%2Fzdbk.zju.edu.cn%2Fjwglxt%2Fxtgl%2Flogin_ssologin.html"))
-        .timeout(const Duration(seconds: 8),
-            onTimeout: () => throw requestTimeout());
-    request.followRedirects = false;
-    request.cookies.add(iPlanetDirectoryPro);
-    response = await request.close().timeout(const Duration(seconds: 8),
-        onTimeout: () => throw requestTimeout());
-    final firstBody = await readResponseBody(response, context: '教务网 CAS 登录');
+    
+    Map<String, Cookie> accumulatedCookies = {};
+    String currentUrl = "https://authserver.cufe.edu.cn/authserver/login?service=https%3A%2F%2Fxuanke.cufe.edu.cn%2Fsso%2Fjziotlogin";
+    int redirectCount = 0;
+    
+    while (redirectCount < 15) {
+      var request = await httpClient
+          .getUrl(Uri.parse(currentUrl))
+          .timeout(const Duration(seconds: 8),
+              onTimeout: () => throw requestTimeout());
+      request.followRedirects = false;
+      
+      // Inject accumulated cookies
+      for (var cookie in accumulatedCookies.values) {
+        request.cookies.add(cookie);
+      }
+      // Explicitly inject CASTGC if domain is authserver (WebVPN CAS callback might redirect here)
+      if (Uri.parse(currentUrl).host == "authserver.cufe.edu.cn") {
+        request.cookies.add(iPlanetDirectoryPro);
+      }
 
-    var stLocation = response.headers.value('location');
-    if (!response.isRedirect || stLocation == null) {
-      throw AuthenticationExpiredException(
-          "教务网登录：统一身份认证凭据无效；HTTP ${response.statusCode}"
-          "；Location ${stLocation ?? '<缺失>'}"
-          "；响应摘要：${responseSummary(firstBody)}");
-    } else if (stLocation.startsWith("http://")) {
-      stLocation = stLocation.replaceFirst("http://", "https://");
-    }
-    request = await httpClient.getUrl(Uri.parse(stLocation)).timeout(
-        const Duration(seconds: 8),
-        onTimeout: () => throw requestTimeout());
-    request.followRedirects = false;
-    response = await request.close().timeout(const Duration(seconds: 8),
-        onTimeout: () => throw requestTimeout());
-    final secondBody = await readResponseBody(response, context: '教务网登录');
-    if (response.statusCode == HttpStatus.unauthorized ||
-        response.statusCode == HttpStatus.forbidden ||
-        bodyIndicatesAuthenticationFailure(secondBody)) {
-      throw AuthenticationExpiredException(
-          "教务网登录态失效；HTTP ${response.statusCode}"
-          "；Location ${response.headers.value(HttpHeaders.locationHeader) ?? '<缺失>'}"
-          "；响应摘要：${responseSummary(secondBody)}");
-    }
-    if (response.statusCode < 200 || response.statusCode >= 400) {
-      throw ExceptionWithMessage("教务网登录失败；HTTP ${response.statusCode}"
-          "；Content-Type ${response.headers.value(HttpHeaders.contentTypeHeader) ?? '<缺失>'}"
-          "；响应摘要：${responseSummary(secondBody)}");
+      var response = await request.close().timeout(const Duration(seconds: 8),
+          onTimeout: () => throw requestTimeout());
+          
+      // Save new cookies
+      for (var cookie in response.cookies) {
+        accumulatedCookies[cookie.name] = cookie;
+      }
+
+      if (response.statusCode >= 300 && response.statusCode < 400) {
+        var nextLocation = response.headers.value(HttpHeaders.locationHeader);
+        if (nextLocation == null) break;
+        
+        // CUFE sends http:// redirects from WebVPN ticketlogin, force upgrade to https to avoid firewall drop
+        if (nextLocation.startsWith("http://")) {
+          nextLocation = nextLocation.replaceFirst("http://", "https://");
+        } else if (nextLocation.startsWith("/")) {
+          final uri = Uri.parse(currentUrl);
+          nextLocation = '${uri.scheme}://${uri.host}$nextLocation';
+        }
+        currentUrl = nextLocation;
+        redirectCount++;
+      } else {
+        // HTTP 200 or other terminal state
+        break;
+      }
     }
 
-    if (response.cookies.any((element) => element.name == 'JSESSIONID')) {
-      _jSessionId = response.cookies
-          .firstWhere((element) => element.name == 'JSESSIONID');
+    if (accumulatedCookies.containsKey('JSESSIONID')) {
+      _jSessionId = accumulatedCookies['JSESSIONID'];
+      if (accumulatedCookies.containsKey('route')) {
+        _route = accumulatedCookies['route'];
+      }
     } else {
       throw ExceptionWithMessage(
-          "教务网登录无法获取 JSESSIONID；HTTP ${response.statusCode}"
-          "；响应摘要：${responseSummary(secondBody)}");
-    }
-
-    if (response.cookies.any((element) => element.name == 'route')) {
-      _route =
-          response.cookies.firstWhere((element) => element.name == 'route');
-    } else {
-      throw ExceptionWithMessage("教务网登录无法获取 route；HTTP ${response.statusCode}"
-          "；响应摘要：${responseSummary(secondBody)}");
+          "教务网登录无法获取 JSESSIONID；重定向最终停留在: $currentUrl");
     }
 
     _sessionGeneration++;
@@ -356,7 +351,7 @@ class Zdbk {
       late HttpClientRequest request;
       late HttpClientResponse response;
       final uri = Uri.parse(
-          "https://zdbk.zju.edu.cn/jwglxt/zycjtj/xszgkc_cxXsZgkcIndex.html?doType=query&queryModel.showCount=5000");
+          "https://xuanke.cufe.edu.cn/jwglxt/zycjtj/xszgkc_cxXsZgkcIndex.html?doType=query&queryModel.showCount=5000");
 
       try {
         request = await httpClient.postUrl(uri).timeout(
@@ -364,7 +359,7 @@ class Zdbk {
             onTimeout: () => throw requestTimeout());
         request.headers
           ..add("Referer",
-              "https://zdbk.zju.edu.cn/jwglxt/xtgl/index_initMenu.html")
+              "https://xuanke.cufe.edu.cn/jwglxt/xtgl/index_initMenu.html")
           ..set('Connection', 'close')
           ..add('User-Agent',
               'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36')
@@ -422,7 +417,7 @@ class Zdbk {
       late HttpClientRequest request;
       late HttpClientResponse response;
       final uri = Uri.parse(
-          "https://zdbk.zju.edu.cn/jwglxt/cxdy/xscjcx_cxXscjIndex.html?doType=query&queryModel.showCount=5000");
+          "https://xuanke.cufe.edu.cn/jwglxt/cjcx/cjcx_cxDgXscj.html?doType=query&gnmkdm=N305005&queryModel.showCount=5000");
 
       try {
         request = await httpClient.postUrl(uri).timeout(
@@ -430,7 +425,7 @@ class Zdbk {
             onTimeout: () => throw requestTimeout());
         request.headers
           ..add("Referer",
-              "https://zdbk.zju.edu.cn/jwglxt/xtgl/index_initMenu.html")
+              "https://xuanke.cufe.edu.cn/jwglxt/xtgl/index_initMenu.html")
           ..set('Connection', 'close')
           ..add('User-Agent',
               'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36')
@@ -483,7 +478,7 @@ class Zdbk {
       late HttpClientRequest request;
       late HttpClientResponse response;
       final uri =
-          Uri.parse("https://zdbk.zju.edu.cn/jwglxt/kbcx/xskbcx_cxXsKb.html");
+          Uri.parse("https://xuanke.cufe.edu.cn/jwglxt/kbcx/xskbcx_cxXsKb.html?gnmkdm=N2151");
 
       try {
         for (var i = 0; i < 3; i++) {
@@ -492,25 +487,29 @@ class Zdbk {
               onTimeout: () => throw requestTimeout());
           request.headers
             ..add("Referer",
-                "https://zdbk.zju.edu.cn/jwglxt/xtgl/index_initMenu.html")
+                "https://xuanke.cufe.edu.cn/jwglxt/xtgl/index_initMenu.html")
             ..set('Connection', 'close')
             ..add('User-Agent',
                 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36')
-            ..add('Accept', 'application/json, text/javascript, */*; q=0.01')
-            ..add('X-Requested-With', 'XMLHttpRequest');
+            ..add('Accept', 'application/json, text/javascript, */*; q=0.01');
           request.cookies.add(_jSessionId!);
           request.cookies.add(_route!);
           request.followRedirects = false;
           request.headers.contentType = ContentType(
               'application', 'x-www-form-urlencoded',
               charset: 'utf-8');
-          request.add(
-              utf8.encode('xnm=$year&xqm=$semester&captcha_value=$_captcha'));
+          final captchaStr = _captcha != null ? '&captcha_value=$_captcha' : '';
+          final bodyBytes = utf8.encode('xnm=$year&xqm=$semester$captchaStr');
+          request.headers.contentLength = bodyBytes.length;
+          request.add(bodyBytes);
           response = await request.close().timeout(const Duration(seconds: 8),
               onTimeout: () => throw requestTimeout());
 
           var responseText =
               await readResponseBody(response, context: '教务网课表接口');
+          print("\n=== RAW TIMETABLE JSON ===");
+          print(responseText);
+          print("==========================\n");
           final context = '教务网课表接口（学年 $year，学期 $semester，请求类型 课表）';
           _validateResponse(response, responseText,
               context: context,
@@ -575,7 +574,7 @@ class Zdbk {
       late HttpClientRequest request;
       late HttpClientResponse response;
       final uri = Uri.parse(
-          "https://zdbk.zju.edu.cn/jwglxt/xskscx/kscx_cxXsgrksIndex.html?doType=query&queryModel.showCount=5000");
+          "https://xuanke.cufe.edu.cn/jwglxt/kwgl/kscx_cxXsksxxIndex.html?doType=query&gnmkdm=N358105&queryModel.showCount=5000");
 
       try {
         request = await httpClient.postUrl(uri).timeout(
@@ -583,7 +582,7 @@ class Zdbk {
             onTimeout: () => throw requestTimeout());
         request.headers
           ..add("Referer",
-              "https://zdbk.zju.edu.cn/jwglxt/xtgl/index_initMenu.html")
+              "https://xuanke.cufe.edu.cn/jwglxt/xtgl/index_initMenu.html")
           ..set('Connection', 'close')
           ..add('User-Agent',
               'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36')
@@ -636,7 +635,7 @@ class Zdbk {
       late HttpClientRequest request;
       late HttpClientResponse response;
       final uri = Uri.parse(
-          "https://zdbk.zju.edu.cn/jwglxt/dessktgl/dessktcx_cxDessktcxIndex.html?gnmkdm=N108001&layout=default&su=$studentId");
+          "https://xuanke.cufe.edu.cn/jwglxt/dessktgl/dessktcx_cxDessktcxIndex.html?gnmkdm=N108001&layout=default&su=$studentId");
 
       try {
         request = await httpClient.getUrl(uri).timeout(
@@ -644,7 +643,7 @@ class Zdbk {
             onTimeout: () => throw requestTimeout());
         request.headers
           ..add("Referer",
-              "https://zdbk.zju.edu.cn/jwglxt/xtgl/index_initMenu.html")
+              "https://xuanke.cufe.edu.cn/jwglxt/xtgl/index_initMenu.html")
           ..set('Connection', 'close')
           ..add('User-Agent',
               'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36')
@@ -791,7 +790,7 @@ class Zdbk {
     }
     request = await httpClient
         .getUrl(Uri.parse(
-            "https://zdbk.zju.edu.cn/jwglxt/kaptcha?time=${DateTime.now().millisecondsSinceEpoch}"))
+            "https://xuanke.cufe.edu.cn/jwglxt/kaptcha?time=${DateTime.now().millisecondsSinceEpoch}"))
         .timeout(const Duration(seconds: 8),
             onTimeout: () => throw requestTimeout());
     request.cookies.add(_jSessionId!);
@@ -824,6 +823,198 @@ class Zdbk {
 
   Future<String> solveCaptcha(HttpClient httpClient) async {
     throw UnimplementedError("验证码识别功能未开发");
+  }
+
+  Future<Tuple<Exception?, List<Session>>> getClassTimetable(
+      HttpClient httpClient,
+      String year,
+      String semester,
+      String njdmId,
+      String zyhId,
+      String bhId,
+      String bh) async {
+    return await _withSitePermit(() async {
+      await _initClassTimetableModule(httpClient);
+      return await _withAutoReloginUnlocked(httpClient, (relogged, retried) async {
+        late HttpClientRequest request;
+        late HttpClientResponse response;
+        final uri = Uri.parse(
+            "https://xuanke.cufe.edu.cn/jwglxt/kbdy/bjkbdy_cxBjKb.html?gnmkdm=N214505");
+
+        try {
+          request = await httpClient.postUrl(uri).timeout(
+              const Duration(seconds: 8),
+              onTimeout: () => throw requestTimeout());
+          request.headers
+            ..add("Referer",
+                "https://xuanke.cufe.edu.cn/jwglxt/kbdy/bjkbdy_cxBjkbdyIndex.html")
+            ..set('Connection', 'close')
+            ..add('User-Agent',
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
+            ..add('Accept', 'application/json, text/javascript, */*; q=0.01');
+          request.cookies.add(_jSessionId!);
+          request.cookies.add(_route!);
+          request.followRedirects = false;
+          request.headers.contentType = ContentType(
+              'application', 'x-www-form-urlencoded',
+              charset: 'utf-8');
+          
+          final bodyBytes = utf8.encode(
+              'xnm=$year&xqm=$semester&xnmc=2026-2027&xqmmc=1&xqh_id=2&njdm_id=$njdmId&zyh_id=$zyhId&bh_id=$bhId&tjkbzdm=1&tjkbzxsdm=0&zymc=&jgmc=&njmc=2026&bj=&xkrs=29&bh=$bh&zxszjjs=false&akcxqjchb=false&kzlx=ck&sfcxxqh=1');
+          request.headers.contentLength = bodyBytes.length;
+          request.add(bodyBytes);
+          response = await request.close().timeout(const Duration(seconds: 8),
+              onTimeout: () => throw requestTimeout());
+
+          var responseText = await readResponseBody(response, context: '班级课表接口');
+          print("\n=== RAW CLASS TIMETABLE JSON ===");
+          print(responseText);
+          print("==========================\n");
+          final context = '班级课表接口（学年 $year，学期 $semester）';
+          _validateResponse(response, responseText,
+              context: context,
+              requestUri: uri,
+              relogged: relogged,
+              retried: retried);
+
+          final payload = decodeJsonMap(responseText,
+              context: '$context：HTTP ${response.statusCode}');
+          final items = asDynamicList(payload['kbList']);
+          if (items == null) {
+            throw ExceptionWithMessage(
+                '$context：缺少 kbList 数组；HTTP ${response.statusCode}');
+          }
+          final sessions = _parseSessions(items, context);
+          return Tuple(null, sessions);
+        } on Object catch (error, stackTrace) {
+          if (error is AuthenticationExpiredException) rethrow;
+          final exception = exceptionFrom(error,
+              context: '班级课表接口（学年 $year，学期 $semester）',
+              requestUri: uri,
+              relogged: relogged,
+              retried: retried,
+              stackTrace: stackTrace);
+          return Tuple(exception, <Session>[]);
+        }
+      });
+    });
+  }
+
+  /// 获取班号信息（用于查询班级课表兜底）
+  /// 返回 Tuple<Exception?, Map<String, String>?>，Map 中包含 'bh_id' 和 'bh'
+  Future<Tuple<Exception?, Map<String, String>?>> getBhIdByClassInfo(
+      HttpClient httpClient,
+      String year,
+      String semester,
+      String njdmId,
+      String zyhId,
+      String bjmc) async {
+    return await _withSitePermit(() async {
+      await _initClassTimetableModule(httpClient);
+      return await _withAutoReloginUnlocked(httpClient, (relogged, retried) async {
+        late HttpClientRequest request;
+        late HttpClientResponse response;
+        final uri = Uri.parse(
+            "https://xuanke.cufe.edu.cn/jwglxt/kbdy/bjkbdy_cxBjkbdyTjkbList.html?gnmkdm=N214505");
+
+        try {
+          request = await httpClient.postUrl(uri).timeout(
+              const Duration(seconds: 8),
+              onTimeout: () => throw requestTimeout());
+          request.headers
+            ..add("Referer",
+                "https://xuanke.cufe.edu.cn/jwglxt/kbdy/bjkbdy_cxBjkbdyIndex.html")
+            ..set('Connection', 'close')
+            ..add('User-Agent',
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
+            ..add('Accept', 'application/json, text/javascript, */*; q=0.01');
+          request.cookies.add(_jSessionId!);
+          request.cookies.add(_route!);
+          request.followRedirects = false;
+          request.headers.contentType = ContentType(
+              'application', 'x-www-form-urlencoded',
+              charset: 'utf-8');
+          
+          // 发送专业、年级等信息，请求班级列表
+          // 注：xqh_id 可能不是必须的，如果不传遇到问题可加入 xqh_id=1 或 2
+          final bodyBytes = utf8.encode(
+              'xnm=$year&xqm=$semester&njdm_id=$njdmId&zyh_id=$zyhId&queryModel.showCount=100&queryModel.currentPage=1&queryModel.sortName=&queryModel.sortOrder=asc&time=0');
+          request.headers.contentLength = bodyBytes.length;
+          request.add(bodyBytes);
+          response = await request.close().timeout(const Duration(seconds: 8),
+              onTimeout: () => throw requestTimeout());
+
+          var responseText = await readResponseBody(response, context: '班级列表接口');
+          final context = '班级列表接口（专业 $zyhId）';
+          _validateResponse(response, responseText,
+              context: context,
+              requestUri: uri,
+              relogged: relogged,
+              retried: retried);
+
+          final payload = decodeJsonMap(responseText,
+              context: '$context：HTTP ${response.statusCode}');
+          
+          final items = asDynamicList(payload['items']);
+          if (items == null) {
+             return Tuple(null, null); // 没查到班级
+          }
+
+          for (var item in items) {
+            if (item is Map) {
+              final String? classTitle = item['bjmc']?.toString() ?? item['bj']?.toString();
+              if (classTitle != null && classTitle == bjmc) {
+                final bhId = item['bh_id']?.toString();
+                final bh = item['bh']?.toString();
+                if (bhId != null && bh != null) {
+                  return Tuple(null, {'bh_id': bhId, 'bh': bh});
+                }
+              }
+            }
+          }
+
+          return Tuple(null, null); // 未找到匹配的班级
+        } on Object catch (error, stackTrace) {
+          if (error is AuthenticationExpiredException) rethrow;
+          final exception = exceptionFrom(error,
+              context: '班级列表接口（专业 $zyhId）',
+              requestUri: uri,
+              relogged: relogged,
+              retried: retried,
+              stackTrace: stackTrace);
+          return Tuple(exception, null);
+        }
+      });
+    });
+  }
+
+  /// 唤醒班级课表模块的状态
+  Future<void> _initClassTimetableModule(HttpClient httpClient) async {
+    await _withAutoReloginUnlocked(httpClient, (relogged, retried) async {
+      final uri = Uri.parse(
+          "https://xuanke.cufe.edu.cn/jwglxt/kbdy/bjkbdy_ylBjkbdyIndex.html?gnmkdm=N214505");
+      late HttpClientRequest request;
+      try {
+        request = await httpClient.getUrl(uri).timeout(
+            const Duration(seconds: 8),
+            onTimeout: () => throw requestTimeout());
+        request.headers
+          ..add("Referer",
+              "https://xuanke.cufe.edu.cn/jwglxt/xtgl/index_initMenu.html")
+          ..set('Connection', 'close')
+          ..add('User-Agent',
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
+        request.cookies.add(_jSessionId!);
+        request.cookies.add(_route!);
+        request.followRedirects = false;
+        
+        final response = await request.close().timeout(const Duration(seconds: 8),
+            onTimeout: () => throw requestTimeout());
+        await readResponseBody(response, context: '唤醒班级课表模块');
+      } catch (_) {
+        // 唤醒接口即使失败也不抛出异常，尽力而为
+      }
+    });
   }
 }
 

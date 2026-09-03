@@ -23,6 +23,7 @@ dependencies:
   rename_app:
   url_launcher:
   quiver: ^3.2.1
+  encrypt: ^5.0.3
   workmanager:
     git:
       url: https://github.com/Celechron/flutter_workmanager.git
