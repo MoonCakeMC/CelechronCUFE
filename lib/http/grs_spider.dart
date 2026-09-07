@@ -137,7 +137,7 @@ class GrsSpider implements Spider {
 
     final serviceErrors = await Future.wait<String?>([
       captureLogin(_grsNew.login(candidateClient, candidateSsoCookie), "研究生院网"),
-      captureLogin(_courses.login(candidateClient, candidateSsoCookie), "学在浙大"),
+      // captureLogin(_courses.login(candidateClient, candidateSsoCookie), "学在浙大"),
       /* _appService
                     .login(_httpClient, _iPlanetDirectoryPro)
                     // ignore: unnecessary_cast
@@ -628,7 +628,7 @@ class GrsSpider implements Spider {
             _describeRefreshFailure(error, stackTrace, source: 'grsGrade')));
 
     // 学在浙大
-    fetches.add(_fetchWithRetry(() => _courses.getTodo(_httpClient))
+    /*fetches.add(_fetchWithRetry(() => _courses.getTodo(_httpClient))
         .then((value) {
       outTodos.clear();
       outTodos.addAll(value.item2);
@@ -640,7 +640,7 @@ class GrsSpider implements Spider {
       }
       return value.item1?.toString();
     }).catchError((Object error, StackTrace stackTrace) =>
-            _describeRefreshFailure(error, stackTrace, source: 'coursesTodo')));
+            _describeRefreshFailure(error, stackTrace, source: 'coursesTodo')));*/
 
     // 异步刷新：每完成一个顶层任务就向上层回调一次当前进度。
     // 配置(0)、课表(1)、本科生课考试(2)、本科生课成绩(3)、研究生课考试(4)、

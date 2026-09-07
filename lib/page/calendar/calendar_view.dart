@@ -159,7 +159,7 @@ class CalendarPage extends StatelessWidget {
                             selectedDecoration: BoxDecoration(
                               color: CupertinoDynamicColor.resolve(
                                   CupertinoColors.activeBlue
-                                      .withValues(alpha: 0.5),
+                                      .withOpacity(0.5),
                                   context),
                               shape: BoxShape.circle,
                             ),
@@ -168,7 +168,7 @@ class CalendarPage extends StatelessWidget {
                             todayDecoration: BoxDecoration(
                               color: CupertinoDynamicColor.resolve(
                                   CupertinoColors.inactiveGray
-                                      .withValues(alpha: 0.5),
+                                      .withOpacity(0.5),
                                   context),
                               shape: BoxShape.circle,
                             ),
@@ -426,7 +426,7 @@ class CalendarPage extends StatelessWidget {
                             .textTheme
                             .textStyle
                             .color!
-                            .withValues(alpha: 0.5),
+                            .withOpacity(0.5),
                       ),
                       const SizedBox(width: 6.0),
                       Expanded(
@@ -439,7 +439,7 @@ class CalendarPage extends StatelessWidget {
                                 .textTheme
                                 .textStyle
                                 .color!
-                                .withValues(alpha: 0.75),
+                                .withOpacity(0.75),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -456,7 +456,7 @@ class CalendarPage extends StatelessWidget {
                               .textTheme
                               .textStyle
                               .color!
-                              .withValues(alpha: 0.5),
+                              .withOpacity(0.5),
                         ),
                         const SizedBox(width: 6.0),
                         Expanded(
@@ -469,7 +469,7 @@ class CalendarPage extends StatelessWidget {
                                   .textTheme
                                   .textStyle
                                   .color!
-                                  .withValues(alpha: 0.75),
+                                  .withOpacity(0.75),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
@@ -486,7 +486,7 @@ class CalendarPage extends StatelessWidget {
                     .textTheme
                     .textStyle
                     .color!
-                    .withValues(alpha: 0.5))
+                    .withOpacity(0.5))
           ],
         ),
       ),

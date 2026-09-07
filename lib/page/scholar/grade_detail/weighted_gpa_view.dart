@@ -238,7 +238,7 @@ class WeightedGpaPage extends StatelessWidget {
                                 boxShadow: [
                                   BoxShadow(
                                     color: CupertinoColors.black
-                                        .withValues(alpha: 0.1),
+                                        .withOpacity(0.1),
                                     spreadRadius: 0,
                                     blurRadius: 12,
                                     offset: const Offset(0, 6),
@@ -279,7 +279,7 @@ class WeightedGpaPage extends StatelessWidget {
                                                         .textTheme
                                                         .textStyle
                                                         .color!
-                                                        .withValues(alpha: 0.5),
+                                                        .withOpacity(0.5),
                                                     fontSize: 12,
                                                     fontWeight:
                                                         FontWeight.normal,
@@ -333,8 +333,7 @@ class WeightedGpaPage extends StatelessWidget {
                                                           .textTheme
                                                           .textStyle
                                                           .color!
-                                                          .withValues(
-                                                              alpha: 0.5),
+                                                          .withOpacity(0.5),
                                                 ),
                                           ),
                                         ),
@@ -376,8 +375,7 @@ class WeightedGpaPage extends StatelessWidget {
                                                           .textTheme
                                                           .textStyle
                                                           .color!
-                                                          .withValues(
-                                                              alpha: 0.7),
+                                                          .withOpacity(0.7),
                                                 ),
                                           ),
                                         ),

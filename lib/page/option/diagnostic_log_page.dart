@@ -467,7 +467,7 @@ class _DiagnosticLogPageState extends State<DiagnosticLogPage> {
       decoration: BoxDecoration(
         color: CupertinoDynamicColor.resolve(
           issue.severity == DiagnosticIssueSeverity.error
-              ? CupertinoColors.systemRed.withValues(alpha: 0.08)
+              ? CupertinoColors.systemRed.withOpacity(0.08)
               : CupertinoColors.tertiarySystemGroupedBackground,
           context,
         ),

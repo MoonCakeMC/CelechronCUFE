@@ -153,14 +153,7 @@ class UgrsSpider implements Spider {
     }
 
     final serviceErrors = await Future.wait<String?>([
-      captureLogin(_courses.login(candidateClient, candidateSsoCookie), "学在浙大"),
-      captureLogin(_zdbk.login(candidateClient, candidateSsoCookie), "教务网"),
-      captureLogin(_sztz.login(candidateClient, candidateSsoCookie), "素质拓展平台",
-          ignoreError: true),
-      captureLogin(_grsNew.login(candidateClient, candidateSsoCookie), "研究生院网",
-          onSuccess: () {
-        fetchGrs = true;
-      }, ignoreError: true),
+      captureLogin(_zdbk.login(candidateClient, candidateSsoCookie), "教务管理"),
     ]);
     loginErrorMessages.addAll(serviceErrors);
 
@@ -344,14 +337,13 @@ class UgrsSpider implements Spider {
     }
 
     final now = DateTime.now();
-    final enrollmentDigits =
-        _username.length >= 3 ? _username.substring(1, 3) : '';
-    final parsedEnrollmentYear = int.tryParse(enrollmentDigits);
-    if (parsedEnrollmentYear == null) {
-      return Tuple7(loginErrorMessages, <String?>['无法解析学号中的入学年份：$_username'],
-          outSemesters, outGrades, outMajorGrade, outSpecialDates, outTodos);
+    var yearEnroll = DateTime.now().year - 2;
+  if (_username.length >= 4) {
+    int? yy = int.tryParse(_username.substring(0, 4));
+    if (yy != null && yy > 2000 && yy <= (DateTime.now().year + 1)) {
+      yearEnroll = yy;
     }
-    var yearEnroll = parsedEnrollmentYear + 2000;
+  }
     var yearGraduate = yearEnroll + 7;
     final timetableYearPlan = timetableAcademicYearPlan(
       now: now,
@@ -688,7 +680,7 @@ class UgrsSpider implements Spider {
     }).catchError((Object error, StackTrace stackTrace) =>
             _describeRefreshFailure(error, stackTrace)));
 
-    fetches.add(_fetchWithRetry(() => _zdbk.getMajorGrade(_httpClient))
+    /*fetches.add(_fetchWithRetry(() => _zdbk.getMajorGrade(_httpClient))
         .then((value) {
       outMajorGrade.clear();
       outMajorGrade.addAll(value.item2.item1);
@@ -703,68 +695,68 @@ class UgrsSpider implements Spider {
 
       return value.item1?.toString();
     }).catchError((Object error, StackTrace stackTrace) =>
-            _describeRefreshFailure(error, stackTrace)));
+            _describeRefreshFailure(error, stackTrace)));*/
 
     // 作业（学在浙大）- 加上重试包装
-    fetches.add(_fetchWithRetry(() => _courses.getTodo(_httpClient))
-        .then((value) {
-      outTodos.clear();
-      outTodos.addAll(value.item2);
-      if (value.item3 == DataSourceStatus.cache) {
-        return degradedRefreshText(
-          '作业：使用缓存，${value.item2.length} 条',
-          details: value.item1 == null ? null : detailedErrorText(value.item1),
-        );
-      }
-      return value.item1?.toString();
-    }).catchError((Object error, StackTrace stackTrace) =>
-            _describeRefreshFailure(error, stackTrace)));
+//     fetches.add(_fetchWithRetry(() => _courses.getTodo(_httpClient))
+//         .then((value) {
+//       outTodos.clear();
+//       outTodos.addAll(value.item2);
+//       if (value.item3 == DataSourceStatus.cache) {
+//         return degradedRefreshText(
+//           '作业：使用缓存，${value.item2.length} 条',
+//           details: value.item1 == null ? null : detailedErrorText(value.item1),
+//         );
+//       }
+//       return value.item1?.toString();
+//     }).catchError((Object error, StackTrace stackTrace) =>
+//             _describeRefreshFailure(error, stackTrace)));
 
     // getSqjl 只负责项目明细；外层记点严格按
     // getMyInfo 网络、getMyInfo 账号缓存、getSqjl 项目合计三级降级。
-    fetches.add(() async {
-      final snapshot = await _sztz.getPracticeScoreData(
-        _httpClient,
-        reauthenticate: _reauthenticateSztz,
-      );
-      if (!snapshot.hasAnyData) {
-        // 两个接口都失败时保留上一次快照，不能用零覆盖旧汇总或旧明细。
-        return snapshot.summaryErrorMessage ??
-            snapshot.errorMessage ??
-            '实践数据当前不可用';
-      }
-      _usePracticeSnapshot(snapshot);
-
-      final degraded = <String>[];
-      if (snapshot.source == PracticeDataSource.sztzCache) {
-        degraded.add('项目实时请求失败，已使用 getSqjl 项目缓存');
-      } else if (snapshot.source == PracticeDataSource.unavailable) {
-        degraded.add('getSqjl 项目明细本次不可用，已保留原有明细');
-      }
-      switch (snapshot.summarySource) {
-        case PracticeSummarySource.cachedMyInfo:
-          degraded.add('getMyInfo 实时请求失败，已使用账号缓存');
-          break;
-        case PracticeSummarySource.calculatedFromSqjl:
-          degraded.add('getMyInfo 及其缓存不可用，已按 getSqjl 项目合计');
-          break;
-        case PracticeSummarySource.unavailable:
-          degraded.add('外层记点汇总本次不可用，已保留原有汇总');
-          break;
-        case PracticeSummarySource.networkMyInfo:
-        case PracticeSummarySource.legacyPersisted:
-          break;
-      }
-      if (degraded.isEmpty) return null;
-      final details = [
-        snapshot.errorMessage,
-        snapshot.summaryErrorMessage,
-      ].whereType<String>().join('；');
-      return degradedRefreshText(
-        '实践：${degraded.join('；')}',
-        details: details.isEmpty ? null : details,
-      );
-    }());
+//     fetches.add(() async {
+//       final snapshot = await _sztz.getPracticeScoreData(
+//         _httpClient,
+//         reauthenticate: _reauthenticateSztz,
+//       );
+//       if (!snapshot.hasAnyData) {
+//         // 两个接口都失败时保留上一次快照，不能用零覆盖旧汇总或旧明细。
+//         return snapshot.summaryErrorMessage ??
+//             snapshot.errorMessage ??
+//             '实践数据当前不可用';
+//       }
+//       _usePracticeSnapshot(snapshot);
+// 
+//       final degraded = <String>[];
+//       if (snapshot.source == PracticeDataSource.sztzCache) {
+//         degraded.add('项目实时请求失败，已使用 getSqjl 项目缓存');
+//       } else if (snapshot.source == PracticeDataSource.unavailable) {
+//         degraded.add('getSqjl 项目明细本次不可用，已保留原有明细');
+//       }
+//       switch (snapshot.summarySource) {
+//         case PracticeSummarySource.cachedMyInfo:
+//           degraded.add('getMyInfo 实时请求失败，已使用账号缓存');
+//           break;
+//         case PracticeSummarySource.calculatedFromSqjl:
+//           degraded.add('getMyInfo 及其缓存不可用，已按 getSqjl 项目合计');
+//           break;
+//         case PracticeSummarySource.unavailable:
+//           degraded.add('外层记点汇总本次不可用，已保留原有汇总');
+//           break;
+//         case PracticeSummarySource.networkMyInfo:
+//         case PracticeSummarySource.legacyPersisted:
+//           break;
+//       }
+//       if (degraded.isEmpty) return null;
+//       final details = [
+//         snapshot.errorMessage,
+//         snapshot.summaryErrorMessage,
+//       ].whereType<String>().join('；');
+//       return degradedRefreshText(
+//         '实践：${degraded.join('；')}',
+//         details: details.isEmpty ? null : details,
+//       );
+//     }());
 
     // 异步刷新：每完成一个顶层任务就向上层回调一次当前进度。
     // 校历(0)、课表(1)、考试(2)、成绩(3)共同拼出学期数据，全部成功后才暴露学期

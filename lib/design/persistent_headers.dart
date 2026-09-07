@@ -64,10 +64,10 @@ class CelechronHeader extends SliverPersistentHeaderDelegate {
           color: shrinkOffset > 12
               ? CupertinoDynamicColor.resolve(
                       CupertinoColors.systemBackground, context)
-                  .withValues(alpha: 0.5)
+                  .withOpacity(0.5)
               : CupertinoDynamicColor.resolve(
                       CupertinoColors.systemBackground, context)
-                  .withValues(alpha: shrinkOffset / 24),
+                  .withOpacity(shrinkOffset / 24),
           child: Column(
             children: [
               Stack(

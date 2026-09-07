@@ -78,7 +78,7 @@ class CourseBriefCard extends StatelessWidget {
                               .textTheme
                               .textStyle
                               .color!
-                              .withValues(alpha: 0.5),
+                              .withOpacity(0.5),
                         ),
                         Expanded(
                             child: Text(' 课号：${course.realId}',
@@ -89,7 +89,7 @@ class CourseBriefCard extends StatelessWidget {
                                       .textTheme
                                       .textStyle
                                       .color!
-                                      .withValues(alpha: 0.75),
+                                      .withOpacity(0.75),
                                   overflow: TextOverflow.ellipsis,
                                 ))),
                       ]),
@@ -101,7 +101,7 @@ class CourseBriefCard extends StatelessWidget {
                               .textTheme
                               .textStyle
                               .color!
-                              .withValues(alpha: 0.5),
+                              .withOpacity(0.5),
                         ),
                         Expanded(
                             child: Text(' 教师：${course.teacher ?? '未知'}',
@@ -112,7 +112,7 @@ class CourseBriefCard extends StatelessWidget {
                                       .textTheme
                                       .textStyle
                                       .color!
-                                      .withValues(alpha: 0.75),
+                                      .withOpacity(0.75),
                                   overflow: TextOverflow.ellipsis,
                                 ))),
                         if (course.grade != null) ...{
@@ -123,7 +123,7 @@ class CourseBriefCard extends StatelessWidget {
                                 .textTheme
                                 .textStyle
                                 .color!
-                                .withValues(alpha: 0.5),
+                                .withOpacity(0.5),
                           ),
                           Text(
                               // grs is 90 / 100, ugrs is 4.0 / 5.0
@@ -135,7 +135,7 @@ class CourseBriefCard extends StatelessWidget {
                                     .textTheme
                                     .textStyle
                                     .color!
-                                    .withValues(alpha: 0.75),
+                                    .withOpacity(0.75),
                                 overflow: TextOverflow.ellipsis,
                               )),
                         }
@@ -153,7 +153,7 @@ class CourseBriefCard extends StatelessWidget {
                                   .textTheme
                                   .textStyle
                                   .color!
-                                  .withValues(alpha: 0.5),
+                                  .withOpacity(0.5),
                             ),
                             Text(' 线上课程',
                                 style: TextStyle(
@@ -163,7 +163,7 @@ class CourseBriefCard extends StatelessWidget {
                                       .textTheme
                                       .textStyle
                                       .color!
-                                      .withValues(alpha: 0.75),
+                                      .withOpacity(0.75),
                                   overflow: TextOverflow.ellipsis,
                                 )),
                             const SizedBox(width: 8.0),
@@ -176,7 +176,7 @@ class CourseBriefCard extends StatelessWidget {
                                   .textTheme
                                   .textStyle
                                   .color!
-                                  .withValues(alpha: 0.5),
+                                  .withOpacity(0.5),
                             ),
                             Text(' ${course.type}',
                                 style: TextStyle(
@@ -186,7 +186,7 @@ class CourseBriefCard extends StatelessWidget {
                                       .textTheme
                                       .textStyle
                                       .color!
-                                      .withValues(alpha: 0.75),
+                                      .withOpacity(0.75),
                                   overflow: TextOverflow.ellipsis,
                                 )),
                           }

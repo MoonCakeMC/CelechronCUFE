@@ -108,7 +108,7 @@ class _SessionCardState extends State<SessionCard>
                   children: [
                     for (var s in widget.sessionList)
                       CupertinoButton(
-                        minimumSize: const Size(22.0, 22.0),
+                        
                         padding:
                             const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 0.0),
                         child: Text(
@@ -173,9 +173,9 @@ class _SessionCardState extends State<SessionCard>
                         sessionName,
                         textAlign: TextAlign.center,
                         maxLines: widget.sessionList.length == 1
-                            ? 3 // 单课程最多3行
+                            ? 3 // 单课程最�?�?
                             : (widget.sessionList.length * 2)
-                                .clamp(2, 6), // 冲突课程最多6行
+                                .clamp(2, 6), // 冲突课程最�?�?
                         overflow: TextOverflow.ellipsis,
                         style: CupertinoTheme.of(context)
                             .textTheme

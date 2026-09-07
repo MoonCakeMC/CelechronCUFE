@@ -1,140 +1,171 @@
+import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
+import 'package:encrypt/encrypt.dart' as encrypt_pkg;
 
 import 'exceptions.dart';
 import 'response_utils.dart';
 
+class YktAppCrypto {
+  static const _keyChars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+
+  static String _genKey() {
+    final rand = Random.secure();
+    return List.generate(16, (_) => _keyChars[rand.nextInt(_keyChars.length)]).join();
+  }
+
+  static String _handleKey(String s, bool isEncrypt) {
+    if (isEncrypt) {
+      final shifted = s.substring(10) + s.substring(0, 10);
+      return shifted.split('').reversed.join();
+    } else {
+      final reversed = s.split('').reversed.join();
+      return reversed.substring(6) + reversed.substring(0, 6);
+    }
+  }
+
+  static String buildDataJson(Map<String, dynamic> params) {
+    final payload = jsonEncode(params);
+    final key = _genKey();
+
+    final encrypter = encrypt_pkg.Encrypter(
+        encrypt_pkg.AES(encrypt_pkg.Key.fromUtf8(key), mode: encrypt_pkg.AESMode.ecb, padding: 'PKCS7'));
+
+    final encrypted = encrypter.encrypt(payload, iv: encrypt_pkg.IV.fromLength(16));
+    final b64 = encrypted.base64;
+
+    return _handleKey(key, true) + b64;
+  }
+
+  static dynamic parseDataJson(String dataJson) {
+    if (dataJson.length < 16) return dataJson;
+
+    final keyStr = _handleKey(dataJson.substring(0, 16), false);
+    final cipherB64 = dataJson.substring(16);
+
+    final encrypter = encrypt_pkg.Encrypter(
+        encrypt_pkg.AES(encrypt_pkg.Key.fromUtf8(keyStr), mode: encrypt_pkg.AESMode.ecb, padding: 'PKCS7'));
+
+    try {
+      final decrypted = encrypter.decrypt64(cipherB64, iv: encrypt_pkg.IV.fromLength(16));
+
+      if (decrypted.startsWith('{') || decrypted.startsWith('[')) {
+        return jsonDecode(decrypted);
+      }
+      return decrypted;
+    } catch (e, stack) {
+      print("=== DECRYPT ERROR ===");
+      print(e);
+      print(stack);
+      rethrow;
+    }
+  }
+}
+
 class ECard {
-  static Future<String> getSynjonesAuth(
-      HttpClient httpClient, Cookie? iPlanetDirectoryPro) async {
-    late HttpClientRequest request;
-    late HttpClientResponse response;
+  static const String _baseUrl = "https://yktapp.cufe.edu.cn";
+  static const String _userAgent =
+      "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.5304.110 Safari/537.36 Language/zh ColorScheme/Light wxwork/5.0.10 (MicroMessenger/6.2) WindowsWechat  MailPlugin_Electron WeMail embeddisk wwmver/3.26.510.632 noMediaCs/true";
 
-    List<Cookie> cookies = [];
-    if (iPlanetDirectoryPro == null) {
-      throw AuthenticationExpiredException("校园卡：统一身份认证凭据无效");
-    }
-    request = await httpClient
-        .getUrl(Uri.parse(
-            "https://elife.zju.edu.cn/berserker-auth/cas/oauth2?resultUrl=https://elife.zju.edu.cn/plat-pc"))
-        .timeout(const Duration(seconds: 8),
-            onTimeout: () => throw ExceptionWithMessage("请求超时"));
-    request.followRedirects = false;
-    cookies.add(iPlanetDirectoryPro);
-    request.cookies.addAll(cookies);
-    response = await request.close().timeout(const Duration(seconds: 8),
+  static Future<Map<String, dynamic>> getBarcodeWithBalance(
+      HttpClient httpClient, String openId) async {
+    
+    httpClient.userAgent = _userAgent;
+
+    // 先模拟前端请求 openHomePageApp 建立会话并获取 JSESSIONID
+    final initParams = {
+      "usertype": "1",
+      "orgid": "2",
+      "openid": openId,
+    };
+    final initDataJson = YktAppCrypto.buildDataJson(initParams);
+    // GET 请求需进行 URL 编码
+    final encodedDataJson = Uri.encodeComponent(initDataJson);
+    final initUri = Uri.parse("$_baseUrl/home/openHomePageApp?openid=$openId&datajson=$encodedDataJson");
+    
+    final initReq = await httpClient.getUrl(initUri).timeout(
+        const Duration(seconds: 15),
         onTimeout: () => throw ExceptionWithMessage("请求超时"));
-
-    // synjones-auth 可能出现在任意一跳 Location 中；每跳必须先收集
-    // 当前响应 Cookie，再访问相对地址解析后的下一跳。
-    var current = Uri.parse(
-        "https://elife.zju.edu.cn/berserker-auth/cas/oauth2?resultUrl=https://elife.zju.edu.cn/plat-pc");
-    for (var redirectCount = 0; redirectCount < 10; redirectCount++) {
-      if (response.statusCode != 301 && response.statusCode != 302) {
-        final body = await readResponseBody(response, context: '校园卡登录');
-        throw AuthenticationExpiredException(
-            "校园卡登录失败；HTTP ${response.statusCode}"
-            "；Content-Type ${response.headers.value(HttpHeaders.contentTypeHeader) ?? '<缺失>'}"
-            "；响应摘要：${responseSummary(body)}");
-      }
-
-      var location = response.headers.value('location');
-      if (location == null) {
-        await response.drain();
-        throw AuthenticationExpiredException(
-            "校园卡登录失败；HTTP ${response.statusCode}；Location 缺失");
-      }
-      var synjonesAuth =
-          RegExp(r'synjones-auth=(.*?)(?:&|$)').firstMatch(location)?.group(1);
-      if (synjonesAuth != null) {
-        await response.drain();
-        return synjonesAuth;
-      }
-
-      await response.drain();
-      current = current.resolve(location);
-      request = await httpClient.getUrl(current).timeout(
-          const Duration(seconds: 8),
-          onTimeout: () => throw ExceptionWithMessage("请求超时"));
-      request.followRedirects = false;
-      cookies.addAll(response.cookies);
-      request.cookies.addAll(cookies);
-      response = await request.close().timeout(const Duration(seconds: 8),
-          onTimeout: () => throw ExceptionWithMessage("请求超时"));
-    }
-    throw ExceptionWithMessage("校园卡登录失败：重定向次数过多");
-  }
-
-  static Future<String> getAccount(
-      HttpClient httpClient, String synjonesAuth) async {
-    late HttpClientRequest request;
-    late HttpClientResponse response;
-
-    request = await httpClient
-        .getUrl(Uri.parse(
-            "https://elife.zju.edu.cn/berserker-app/ykt/tsm/getCampusCards"))
-        .timeout(const Duration(seconds: 8),
-            onTimeout: () => throw ExceptionWithMessage("请求超时"));
-    request.headers.add("Synjones-Auth", "Bearer $synjonesAuth");
-    request.followRedirects = false;
-    response = await request.close().timeout(const Duration(seconds: 8),
+    initReq.headers.set("Accept", "application/json, text/plain, */*");
+    initReq.headers.set("x-requested-with", "XMLHttpRequest", preserveHeaderCase: true);
+    initReq.headers.set("session-type", "uniapp", preserveHeaderCase: true);
+    initReq.headers.set("isWechatApp", "true", preserveHeaderCase: true);
+    final initRes = await initReq.close().timeout(const Duration(seconds: 15),
         onTimeout: () => throw ExceptionWithMessage("请求超时"));
-
-    var accountJson =
-        await readResponseText(response, context: '校园卡账户接口', expectJson: true);
-    final payload = decodeJsonMap(accountJson,
-        context: '校园卡账户接口；HTTP ${response.statusCode}');
-    if (jsonIndicatesAuthenticationFailure(payload)) {
-      throw AuthenticationExpiredException('校园卡账户接口：登录态已失效');
+    
+    // Dart 自带的 initRes.cookies 会由于服务器下发的 "null; SameSite" 等格式不规范报错 FormatException，因此手动提取
+    final setCookies = initRes.headers[HttpHeaders.setCookieHeader] ?? [];
+    final cookieStrParts = <String>[];
+    for (var sc in setCookies) {
+      final pair = sc.split(';')[0].trim();
+      if (pair.isNotEmpty) cookieStrParts.add(pair);
     }
-    final data = asStringMap(payload['data']);
-    final cardList = asDynamicList(data?['card']) ?? const [];
-    // Card list is a List<Map<String, dynamic>> object, which may contain multiple cards.
-    // Select the card which has the highest balance.
-    // The account number is stored in the 'account' field.
-    // The balance is stored in the 'db_balance' field.
-    final cards = cardList
-        .map(asStringMap)
-        .whereType<Map<String, dynamic>>()
-        .where((card) => asString(card['account'])?.isNotEmpty == true)
-        .toList();
-    if (cards.isEmpty) {
-      throw ExceptionWithMessage(
-          '校园卡账户接口：未返回有效卡片；响应摘要：${responseSummary(accountJson)}');
-    }
-    cards.sort((a, b) => (asDouble(b['db_balance']) ?? 0.0)
-        .compareTo(asDouble(a['db_balance']) ?? 0.0));
-    return asString(cards.first['account'])!;
-  }
+    await initRes.drain(); // 丢弃响应体，仅获取 Cookie
 
-  static Future<String> getBarcode(
-      HttpClient httpClient, String synjonesAuth, String eCardAccount) async {
-    late HttpClientRequest request;
-    late HttpClientResponse response;
-
-    request = await httpClient
-        .getUrl(Uri.parse(
-            "https://elife.zju.edu.cn/berserker-app/ykt/tsm/batchGetBarCodeGet?account=$eCardAccount&payacc=%23%23%23&paytype=1&synAccessSource=app"))
-        .timeout(const Duration(seconds: 8),
-            onTimeout: () => throw ExceptionWithMessage("请求超时1"));
-    request.headers.add("synjones-auth", "bearer $synjonesAuth");
-    request.followRedirects = false;
-    response = await request.close().timeout(const Duration(seconds: 8),
+    final uri = Uri.parse("$_baseUrl/offlineCode/openVirtualcard?openid=$openId");
+    final request = await httpClient.postUrl(uri).timeout(
+        const Duration(seconds: 15),
         onTimeout: () => throw ExceptionWithMessage("请求超时"));
+    
+    if (cookieStrParts.isNotEmpty) {
+      request.headers.set(HttpHeaders.cookieHeader, cookieStrParts.join('; '));
+    }
 
-    var barcodeJson =
-        await readResponseText(response, context: '校园卡付款码接口', expectJson: true);
-    final payload = decodeJsonMap(barcodeJson,
-        context: '校园卡付款码接口；HTTP ${response.statusCode}');
-    if (jsonIndicatesAuthenticationFailure(payload)) {
-      throw AuthenticationExpiredException('校园卡付款码接口：登录态已失效');
+    request.headers.set("Accept", "application/json, text/plain, */*");
+    request.headers.set("x-requested-with", "XMLHttpRequest", preserveHeaderCase: true);
+    request.headers.set("session-type", "uniapp", preserveHeaderCase: true);
+    request.headers.set("isWechatApp", "true", preserveHeaderCase: true);
+    request.headers.set("Content-Type", "application/json", preserveHeaderCase: true);
+
+    final params = {
+      "appcode": "4",
+      "orgid": "2",
+      "openid": openId,
+      // 首次可以带 paytype="1"，但如果不确定，可以不带或带 1。
+      "paytype": "1"
+    };
+
+    final dataJson = YktAppCrypto.buildDataJson(params);
+    request.write(jsonEncode({"datajson": dataJson}));
+
+    final response = await request.close().timeout(const Duration(seconds: 15),
+        onTimeout: () => throw ExceptionWithMessage("请求超时"));
+        
+    final bodyJson = await readResponseText(response, context: '获取付款码', expectJson: true);
+    print("=== HTTP RESPONSE BODY ===");
+    print(bodyJson);
+    
+    final payload = decodeJsonMap(bodyJson, context: '获取付款码解析');
+    
+    if (payload.containsKey('datajson')) {
+      final String rawDataJson = payload['datajson'];
+      print("=== RAW DATAJSON ===");
+      print(rawDataJson);
+      
+      final decrypted = YktAppCrypto.parseDataJson(rawDataJson.replaceAll(RegExp(r'\s+'), ''));
+      print("=== DECRYPTED DATA ===");
+      print(decrypted);
+      
+      if (decrypted is! Map) {
+        throw ExceptionWithMessage("解密后的数据不是 JSON 对象: $decrypted");
+      }
+      
+      final Map<String, dynamic> data = decrypted['data'] ?? {};
+      
+      final code = data['code'] as String?;
+      final balance = data['cardbal']?.toString();
+      final realname = data['realname'] as String?;
+      
+      if (code == null || code.isEmpty) {
+         throw ExceptionWithMessage("返回的条码为空. Decrypted data: $decrypted");
+      }
+      return {
+        "code": code,
+        "balance": balance,
+        "realname": realname,
+      };
+    } else {
+      throw ExceptionWithMessage("返回结构不含 datajson. Body: $bodyJson");
     }
-    final data = asStringMap(payload['data']);
-    final barcodes = asDynamicList(data?['barcode']) ?? const [];
-    final barcode = barcodes.isEmpty ? null : asString(barcodes.first);
-    if (barcode == null || barcode.isEmpty) {
-      throw ExceptionWithMessage(
-          '校园卡付款码接口：未返回有效付款码；响应摘要：${responseSummary(barcodeJson)}');
-    }
-    return barcode;
   }
 }

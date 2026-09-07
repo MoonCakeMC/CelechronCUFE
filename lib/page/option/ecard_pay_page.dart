@@ -1,159 +1,181 @@
 import 'dart:io';
-import 'dart:math';
+import 'dart:typed_data';
+import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'package:get/get.dart';
+import 'package:qr/qr.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'package:celechron/design/persistent_headers.dart';
 import '../../http/zjuServices/ecard.dart';
 import '../../utils/utils.dart';
 
-class ECardPayPage extends StatelessWidget {
-  ECardPayPage({super.key});
+class ECardPayPage extends StatefulWidget {
+  const ECardPayPage({super.key});
 
+  @override
+  State<ECardPayPage> createState() => _ECardPayPageState();
+}
+
+class _ECardPayPageState extends State<ECardPayPage> {
   final _httpClient = HttpClient();
+  Timer? _refreshTimer;
+  
+  bool _loading = true;
+  String _barcode = '';
+  String _balance = '';
+  String _realname = '';
 
-  /// 测试账号学号；未登录时回退到该账号，便于本地预览付款码。
-  static const _testAccount = '3200000000';
+  @override
+  void initState() {
+    super.initState();
+    _fetchCode();
+    // 每 30 秒自动刷新一次，避免二维码在收银机处被提示“已过期”
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      _fetchCode();
+    });
+  }
 
-  Future<String?> _requestNewCode() async {
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    _httpClient.close();
+    super.dispose();
+  }
+
+  Future<void> _fetchCode() async {
+    setState(() {
+      _loading = true;
+    });
+    
     const secureStorage = FlutterSecureStorage();
-    var synjonesAuth = await secureStorage.read(
-        key: 'synjonesAuth', iOptions: secureStorageIOSOptions);
-    var eCardAccount = await secureStorage.read(
-        key: 'eCardAccount', iOptions: secureStorageIOSOptions);
+    var cufeOpenId = await secureStorage.read(
+        key: 'cufeOpenId', iOptions: secureStorageIOSOptions);
 
-    // 未登录或测试账号：不请求真实接口，生成模拟付款码
-    if (synjonesAuth == null || synjonesAuth == _testAccount) {
-      return List.generate(16, (_) => (Random().nextInt(10)).toString()).join();
+    if (cufeOpenId == null || cufeOpenId.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _barcode = 'PLEASE_CONFIGURE_OPENID';
+          _balance = '';
+          _realname = '';
+        });
+      }
+      return;
     }
 
-    eCardAccount ??= await ECard.getAccount(_httpClient, synjonesAuth);
     try {
-      _httpClient.userAgent =
-          "E-CampusZJU/2.3.20 (iPhone; iOS 17.5.1; Scale/3.00)";
-      return await ECard.getBarcode(_httpClient, synjonesAuth, eCardAccount);
-    } catch (e) {
-      // 网络/鉴权失败时同样回退到测试码，避免页面空白
-      return List.generate(16, (_) => (Random().nextInt(10)).toString()).join();
+      final res = await ECard.getBarcodeWithBalance(_httpClient, cufeOpenId);
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _barcode = res['code'] ?? '';
+          _balance = res['balance'] ?? '';
+          _realname = res['realname'] ?? '';
+        });
+      }
+    } catch (e, stackTrace) {
+      print('=== ECARD ERROR ===');
+      print(e);
+      print(stackTrace);
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _barcode = 'ERROR';
+          _balance = '';
+          _realname = '';
+        });
+      }
     }
   }
 
-  final RxString _barcode = ''.obs;
-  final RxBool _loading = true.obs;
+  static Uint8List hexToBytes(String hexStr) {
+    if (hexStr.length % 2 != 0) return Uint8List(0);
+    final bytes = Uint8List(hexStr.length ~/ 2);
+    for (var i = 0; i < hexStr.length; i += 2) {
+      bytes[i ~/ 2] = int.parse(hexStr.substring(i, i + 2), radix: 16);
+    }
+    return bytes;
+  }
 
   @override
   Widget build(BuildContext context) {
-    _requestNewCode().then((code) {
-      if (code == null) {
-        _requestNewCode().then((code) {
-          _loading.value = false;
-          _barcode.value = code ?? '';
-        });
-      } else {
-        _loading.value = false;
-        _barcode.value = code;
-      }
-    });
     return CupertinoPageScaffold(
       child: SafeArea(
         child: CustomScrollView(
           slivers: [
-            const CelechronSliverTextHeader(subtitle: '付款码'),
+            const CelechronSliverTextHeader(subtitle: '校园卡付款码'),
             SliverFillRemaining(
                 child: Column(
               children: [
-                const Spacer(
-                  flex: 4,
-                ),
-                Obx(() {
-                  if (_loading.value) {
-                    return const CupertinoActivityIndicator();
-                  } else {
-                    return GestureDetector(
-                        onTap: () => _requestNewCode()
-                            .then((value) => _barcode.value = value ?? ''),
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            // White background
-                            Container(
-                              width: 200,
-                              height: 200,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                            _barcode.value.isNotEmpty &&
-                                    _barcode.value.length < 30
-                                ? QrImageView(
-                                    data: _barcode.value, version: 3, size: 200)
-                                : Text(_barcode.value,
-                                    style: const TextStyle(
-                                        color: CupertinoColors.black)),
-                          ],
-                        ));
-                  }
-                }),
-                const SizedBox(
-                  height: 20,
-                ),
-                Obx(() {
-                  if (_loading.value) {
-                    return const Text('加载中...');
-                  }
-                  return Text(
-                      '付款码：${_barcode.value.isNotEmpty ? _barcode.value : '加载失败'}');
-                }),
-                const SizedBox(
-                  height: 30,
-                ),
-                Obx(() {
-                  if (_loading.value) {
-                    return const SizedBox.shrink();
-                  }
-                  return CupertinoButton(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 12,
+                const Spacer(flex: 4),
+                if (_loading && _barcode.isEmpty)
+                  const CupertinoActivityIndicator()
+                else
+                  GestureDetector(
+                    onTap: _fetchCode,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Container(
+                          width: 200,
+                          height: 200,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        if (_barcode == 'PLEASE_CONFIGURE_OPENID')
+                          const Text('请先在选项页\n配置 OpenID',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: CupertinoColors.black))
+                        else if (_barcode != 'ERROR' && _barcode.isNotEmpty)
+                          QrImageView.withQr(
+                              qr: QrCode.fromUint8List(
+                                  data: hexToBytes(_barcode),
+                                  errorCorrectLevel: QrErrorCorrectLevel.L),
+                              size: 200)
+                        else
+                          const Text('加载失败',
+                              style: TextStyle(color: CupertinoColors.black)),
+                      ],
                     ),
+                  ),
+                const SizedBox(height: 20),
+                if (_loading && _barcode.isEmpty)
+                  const Text('加载中...')
+                else if (_barcode == 'PLEASE_CONFIGURE_OPENID')
+                  const Text('未配置 OpenID')
+                else if (_barcode == 'ERROR')
+                  const Text('获取失败，请重试')
+                else
+                  Text(
+                      (_realname.isNotEmpty ? '姓名：$_realname\n' : '') +
+                          '余额：$_balance 元\n(已开启 30 秒自动刷新)',
+                      textAlign: TextAlign.center),
+                const SizedBox(height: 30),
+                if (_loading)
+                  const CupertinoActivityIndicator()
+                else
+                  CupertinoButton(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                     color: CupertinoColors.activeBlue,
                     borderRadius: BorderRadius.circular(20),
-                    onPressed: () {
-                      _loading.value = true;
-                      _requestNewCode().then((value) {
-                        _loading.value = false;
-                        _barcode.value = value ?? '';
-                      });
-                    },
+                    onPressed: _fetchCode,
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
-                          CupertinoIcons.refresh,
-                          size: 18,
-                          color: CupertinoColors.white,
-                        ),
+                        Icon(CupertinoIcons.refresh, size: 18, color: CupertinoColors.white),
                         SizedBox(width: 8),
-                        Text(
-                          '刷新二维码',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                            color: CupertinoColors.white,
-                          ),
+                        Text('刷新二维码',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: CupertinoColors.white),
                         ),
                       ],
                     ),
-                  );
-                }),
-                const Spacer(
-                  flex: 6,
-                ),
+                  ),
+                const Spacer(flex: 6),
               ],
             ))
           ],

@@ -153,7 +153,7 @@ class _TwoLineCardState extends State<TwoLineCard>
                         .textTheme
                         .textStyle
                         .color!
-                        .withValues(alpha: 0.5),
+                        .withOpacity(0.5),
                     fontSize: 14,
                     fontWeight: FontWeight.normal,
                   ),

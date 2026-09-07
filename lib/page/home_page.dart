@@ -52,7 +52,7 @@ class _HomePageState extends State<HomePage> {
       iconSize: 26,
       backgroundColor: CupertinoDynamicColor.resolve(
               CupertinoColors.secondarySystemBackground, context)
-          .withValues(alpha: 0.5),
+          .withOpacity(0.5),
       items: const <BottomNavigationBarItem>[
         BottomNavigationBarItem(
           icon: Icon(CupertinoIcons.time),

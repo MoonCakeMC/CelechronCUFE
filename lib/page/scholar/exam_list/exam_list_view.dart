@@ -87,7 +87,7 @@ class _ExamListPageState extends State<ExamListPage> {
                               .textTheme
                               .textStyle
                               .color!
-                              .withValues(alpha: 0.5),
+                              .withOpacity(0.5),
                         ),
                         Expanded(
                             child: Text(' 时间：${exams[0].chineseTime}',
@@ -98,7 +98,7 @@ class _ExamListPageState extends State<ExamListPage> {
                                       .textTheme
                                       .textStyle
                                       .color!
-                                      .withValues(alpha: 0.75),
+                                      .withOpacity(0.75),
                                   overflow: TextOverflow.ellipsis,
                                 )))
                       ]),
@@ -110,7 +110,7 @@ class _ExamListPageState extends State<ExamListPage> {
                               .textTheme
                               .textStyle
                               .color!
-                              .withValues(alpha: 0.5),
+                              .withOpacity(0.5),
                         ),
                         Expanded(
                             child: Text(' 地点：${exams[0].location ?? '未知'}',
@@ -121,7 +121,7 @@ class _ExamListPageState extends State<ExamListPage> {
                                       .textTheme
                                       .textStyle
                                       .color!
-                                      .withValues(alpha: 0.75),
+                                      .withOpacity(0.75),
                                   overflow: TextOverflow.ellipsis,
                                 )))
                       ]),
@@ -133,7 +133,7 @@ class _ExamListPageState extends State<ExamListPage> {
                               .textTheme
                               .textStyle
                               .color!
-                              .withValues(alpha: 0.5),
+                              .withOpacity(0.5),
                         ),
                         Expanded(
                             child: Text(' 座位：${exams[0].seat ?? '未知'}',
@@ -144,7 +144,7 @@ class _ExamListPageState extends State<ExamListPage> {
                                       .textTheme
                                       .textStyle
                                       .color!
-                                      .withValues(alpha: 0.75),
+                                      .withOpacity(0.75),
                                   overflow: TextOverflow.ellipsis,
                                 )))
                       ]),
@@ -196,7 +196,7 @@ class _ExamListPageState extends State<ExamListPage> {
                                 .textTheme
                                 .textStyle
                                 .color!
-                                .withValues(alpha: 0.5),
+                                .withOpacity(0.5),
                           ),
                           Expanded(
                               child: Text(' 时间：${exams[i].chineseTime}',
@@ -207,7 +207,7 @@ class _ExamListPageState extends State<ExamListPage> {
                                         .textTheme
                                         .textStyle
                                         .color!
-                                        .withValues(alpha: 0.75),
+                                        .withOpacity(0.75),
                                     overflow: TextOverflow.ellipsis,
                                   )))
                         ]),
@@ -219,7 +219,7 @@ class _ExamListPageState extends State<ExamListPage> {
                                 .textTheme
                                 .textStyle
                                 .color!
-                                .withValues(alpha: 0.5),
+                                .withOpacity(0.5),
                           ),
                           Expanded(
                               child: Text(' 地点：${exams[i].location ?? '未知'}',
@@ -230,7 +230,7 @@ class _ExamListPageState extends State<ExamListPage> {
                                         .textTheme
                                         .textStyle
                                         .color!
-                                        .withValues(alpha: 0.75),
+                                        .withOpacity(0.75),
                                     overflow: TextOverflow.ellipsis,
                                   )))
                         ]),
@@ -242,7 +242,7 @@ class _ExamListPageState extends State<ExamListPage> {
                                 .textTheme
                                 .textStyle
                                 .color!
-                                .withValues(alpha: 0.5),
+                                .withOpacity(0.5),
                           ),
                           Expanded(
                               child: Text(' 座位：${exams[i].seat ?? '未知'}',
@@ -253,7 +253,7 @@ class _ExamListPageState extends State<ExamListPage> {
                                         .textTheme
                                         .textStyle
                                         .color!
-                                        .withValues(alpha: 0.75),
+                                        .withOpacity(0.75),
                                     overflow: TextOverflow.ellipsis,
                                   )))
                         ]),

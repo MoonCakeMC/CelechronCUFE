@@ -209,7 +209,7 @@ class TaskPage extends StatelessWidget {
                     width: 36,
                     height: 36,
                     decoration: BoxDecoration(
-                      color: CupertinoColors.white.withValues(alpha: 0.2),
+                      color: CupertinoColors.white.withOpacity(0.2),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
@@ -233,7 +233,7 @@ class TaskPage extends StatelessWidget {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: CupertinoColors.white.withValues(alpha: 0.2),
+                color: CupertinoColors.white.withOpacity(0.2),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -370,7 +370,7 @@ class TaskPage extends StatelessWidget {
                             .textTheme
                             .textStyle
                             .color!
-                            .withValues(alpha: 0.5),
+                            .withOpacity(0.5),
                       ),
                       Expanded(
                         child: Text(
@@ -384,7 +384,7 @@ class TaskPage extends StatelessWidget {
                                 .textTheme
                                 .textStyle
                                 .color!
-                                .withValues(alpha: 0.75),
+                                .withOpacity(0.75),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -401,7 +401,7 @@ class TaskPage extends StatelessWidget {
                               .textTheme
                               .textStyle
                               .color!
-                              .withValues(alpha: 0.5),
+                              .withOpacity(0.5),
                         ),
                         Expanded(
                           child: Text(
@@ -413,7 +413,7 @@ class TaskPage extends StatelessWidget {
                                   .textTheme
                                   .textStyle
                                   .color!
-                                  .withValues(alpha: 0.75),
+                                  .withOpacity(0.75),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
@@ -430,7 +430,7 @@ class TaskPage extends StatelessWidget {
                             .textTheme
                             .textStyle
                             .color!
-                            .withValues(alpha: 0.5),
+                            .withOpacity(0.5),
                       ),
                       Expanded(
                           child: Text(' 地点：${deadline.location}',
@@ -441,7 +441,7 @@ class TaskPage extends StatelessWidget {
                                     .textTheme
                                     .textStyle
                                     .color!
-                                    .withValues(alpha: 0.75),
+                                    .withOpacity(0.75),
                                 overflow: TextOverflow.ellipsis,
                               )))
                     ]),
@@ -455,7 +455,7 @@ class TaskPage extends StatelessWidget {
                             .textTheme
                             .textStyle
                             .color!
-                            .withValues(alpha: 0.5),
+                            .withOpacity(0.5),
                       ),
                       Expanded(
                           child: Text(deadlineProgress(deadline),
@@ -466,7 +466,7 @@ class TaskPage extends StatelessWidget {
                                     .textTheme
                                     .textStyle
                                     .color!
-                                    .withValues(alpha: 0.75),
+                                    .withOpacity(0.75),
                                 overflow: TextOverflow.ellipsis,
                               ))),
                     ]),

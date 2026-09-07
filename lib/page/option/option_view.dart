@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'package:url_launcher/url_launcher_string.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'package:celechron/utils/utils.dart';
 import 'package:celechron/model/option.dart';
@@ -408,6 +409,56 @@ class OptionPage extends StatelessWidget {
                     onTap: () async {
                       Navigator.of(context, rootNavigator: true)
                           .pushNamed('/ecardpaypage');
+                    },
+                  ),
+                  CupertinoListTile(
+                    title: const Text('配置校园卡 OpenID'),
+                    trailing: const BackChervonRow(),
+                    onTap: () async {
+                      final controller = TextEditingController();
+                      const secureStorage = FlutterSecureStorage();
+                      final currentOpenId = await secureStorage.read(
+                              key: 'cufeOpenId',
+                              iOptions: secureStorageIOSOptions) ??
+                          '';
+                      controller.text = currentOpenId;
+                      if (!context.mounted) return;
+                      showCupertinoDialog(
+                        context: context,
+                        builder: (context) {
+                          return CupertinoAlertDialog(
+                            title: const Text('配置校园卡 OpenID'),
+                            content: Padding(
+                              padding: const EdgeInsets.only(top: 8.0),
+                              child: CupertinoTextField(
+                                controller: controller,
+                                placeholder: '请输入获取到的 OpenID',
+                                clearButtonMode: OverlayVisibilityMode.editing,
+                              ),
+                            ),
+                            actions: [
+                              CupertinoDialogAction(
+                                child: const Text('取消'),
+                                onPressed: () {
+                                  Navigator.of(context).pop();
+                                },
+                              ),
+                              CupertinoDialogAction(
+                                child: const Text('保存'),
+                                onPressed: () async {
+                                  await secureStorage.write(
+                                      key: 'cufeOpenId',
+                                      value: controller.text,
+                                      iOptions: secureStorageIOSOptions);
+                                  if (context.mounted) {
+                                    Navigator.of(context).pop();
+                                  }
+                                },
+                              ),
+                            ],
+                          );
+                        },
+                      );
                     },
                   ),
                 ])),

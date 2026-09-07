@@ -180,7 +180,7 @@ class ScholarPage extends StatelessWidget {
                         child: RoundRectangleCardWithForehead(
                             foreheadColor: CustomCupertinoDynamicColors
                                 .okGreen.darkColor
-                                .withValues(alpha: 0.25),
+                                .withOpacity(0.25),
                             forehead: Obx(() => Row(children: [
                                   // University Icon
                                   Padding(
@@ -351,7 +351,7 @@ class ScholarPage extends StatelessWidget {
                         animate: false,
                         foreheadColor: CustomCupertinoDynamicColors
                             .cyan.darkColor
-                            .withValues(alpha: 0.25),
+                            .withOpacity(0.25),
                         forehead: Obx(() => Row(children: [
                               // University Icon
                               Padding(
@@ -546,7 +546,7 @@ class ScholarPage extends StatelessWidget {
                         animate: false,
                         foreheadColor: CustomCupertinoDynamicColors
                             .magenta.darkColor
-                            .withValues(alpha: 0.25),
+                            .withOpacity(0.25),
                         forehead: Obx(() => Row(children: [
                               Padding(
                                 padding: const EdgeInsets.only(
@@ -677,7 +677,7 @@ class ScholarPage extends StatelessWidget {
                         animate: false,
                         foreheadColor: CustomCupertinoDynamicColors
                             .peach.darkColor
-                            .withValues(alpha: 0.25),
+                            .withOpacity(0.25),
                         forehead: Obx(() => Row(children: [
                               Padding(
                                 padding: const EdgeInsets.only(
@@ -985,8 +985,8 @@ class ScholarPage extends StatelessWidget {
                                 CupertinoColors.separator, context),
                             height: 14,
                           ),
-                          const SizedBox(height: 12),
-                          _buildTodos(context),
+                          const SizedBox(height: 12),// 
+                          // _buildTodos(context),
                         ]
                       : [
                           _buildGradeBrief(context),
@@ -1006,8 +1006,8 @@ class ScholarPage extends StatelessWidget {
                                 CupertinoColors.separator, context),
                             height: 14,
                           ),
-                          const SizedBox(height: 12),
-                          _buildTodos(context),
+                          const SizedBox(height: 12),// 
+                          // _buildTodos(context),
                           const SizedBox(height: 12),
                           Divider(
                             thickness: 0,
@@ -1016,7 +1016,7 @@ class ScholarPage extends StatelessWidget {
                             height: 14,
                           ),
                           const SizedBox(height: 12),
-                          _buildPractice(context),
+                          // _buildPractice(context),
                           const SizedBox(height: 20),
                         ],
                 ),

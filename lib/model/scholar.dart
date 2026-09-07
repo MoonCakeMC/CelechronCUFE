@@ -39,7 +39,7 @@ class Scholar {
   String? password;
   Spider? _spider;
 
-  bool get isGrs => !username!.startsWith('3');
+  bool get isGrs => false;
 
   // 按学期整理好的学业信息，包括该学期的所有科目、考试、课表、均绩等
   List<Semester> semesters = <Semester>[];

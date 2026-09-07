@@ -42,7 +42,7 @@ class TodoCard extends StatelessWidget {
                       .textTheme
                       .textStyle
                       .color!
-                      .withValues(alpha: 0.5),
+                      .withOpacity(0.5),
                   fontSize: 14,
                   fontWeight: FontWeight.normal,
                 ),
