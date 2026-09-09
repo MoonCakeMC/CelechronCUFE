@@ -63,8 +63,9 @@ class _SessionCardState extends State<SessionCard>
       } else {
         sessionName = "冲突课程\n";
         for (var i in widget.sessionList) {
+          // 同名课程的不同安排（如分周授课）也要能区分教师
           sessionName =
-              '$sessionName\n${i.time.first}-${i.time.last}: ${i.name}';
+              '$sessionName\n${i.time.first}-${i.time.last}: ${i.name}（${i.teacher}）';
         }
       }
     }
@@ -112,7 +113,7 @@ class _SessionCardState extends State<SessionCard>
                         padding:
                             const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 0.0),
                         child: Text(
-                          s.name,
+                          '${s.name}（${s.teacher}）',
                           textAlign: TextAlign.center,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,

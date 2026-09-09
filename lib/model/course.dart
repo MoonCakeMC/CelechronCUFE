@@ -28,6 +28,23 @@ class Course {
     return key ?? '未知';
   }
 
+  /// 课程的全部教师（从各安排收集并去重，保证分周授课的多教师都能展示）
+  List<String> get teachers {
+    final teachers = <String>{};
+    for (final session in sessions) {
+      if (session.teacher.isNotEmpty && session.teacher != '未知教师') {
+        teachers.add(session.teacher);
+      }
+    }
+    final courseTeacher = teacher;
+    if (courseTeacher != null &&
+        courseTeacher.isNotEmpty &&
+        courseTeacher != '未知教师') {
+      teachers.add(courseTeacher);
+    }
+    return teachers.toList();
+  }
+
   Course._empty()
       : name = '未知课程',
         confirmed = true;
@@ -127,37 +144,48 @@ class Course {
     if (session.type != null && type == null) {
       type = session.type!;
     }
+    // 无排课时间的课程（如实践课）不参与时间合并，直接加入
+    if (session.time.isEmpty) {
+      sessions.add(session);
+      return true;
+    }
+    // 判断两个安排是否为“同一时间安排”。中财课表常把同一课程拆成
+    // 多条不同周次的安排（如国家安全教育第4/6/8/10周由不同教师授课），
+    // 这些安排周次不同，必须保留为独立 session，不能当作重复记录合并。
+    bool sameSchedule(Session a, Session b) {
+      if (a.dayOfWeek != b.dayOfWeek ||
+          a.oddWeek != b.oddWeek ||
+          a.evenWeek != b.evenWeek ||
+          a.location != b.location ||
+          a.customRepeat != b.customRepeat) {
+        return false;
+      }
+      if (a.customRepeat) {
+        if (a.customRepeatWeeks.length != b.customRepeatWeeks.length) {
+          return false;
+        }
+        for (var i = 0; i < a.customRepeatWeeks.length; i++) {
+          if (a.customRepeatWeeks[i] != b.customRepeatWeeks[i]) return false;
+        }
+      }
+      return true;
+    }
+
     if (sessions.any((e) =>
-        e.dayOfWeek == session.dayOfWeek &&
-        e.oddWeek == session.oddWeek &&
-        e.evenWeek == session.evenWeek &&
-        e.location == session.location &&
-        e.time.contains(session.time.first))) {
+        sameSchedule(e, session) && e.time.contains(session.time.first))) {
       // 观察到修改过某短学期上课周数的长学期课程出现秋+冬两个session
       // 合并学期类型
       var currentSession = sessions.firstWhere((e) =>
-          e.dayOfWeek == session.dayOfWeek &&
-          e.oddWeek == session.oddWeek &&
-          e.evenWeek == session.evenWeek &&
-          e.location == session.location &&
-          e.time.contains(session.time.first));
+          sameSchedule(e, session) && e.time.contains(session.time.first));
       currentSession.firstHalf = currentSession.firstHalf || session.firstHalf;
       currentSession.secondHalf =
           currentSession.secondHalf || session.secondHalf;
       return false;
     }
     if (sessions.any((e) =>
-        e.dayOfWeek == session.dayOfWeek &&
-        e.oddWeek == session.oddWeek &&
-        e.evenWeek == session.evenWeek &&
-        e.location == session.location &&
-        (e.time.last + 1 == session.time.first))) {
+        sameSchedule(e, session) && (e.time.last + 1 == session.time.first))) {
       var incompleteSession = sessions.firstWhere((e) =>
-          e.dayOfWeek == session.dayOfWeek &&
-          e.oddWeek == session.oddWeek &&
-          e.evenWeek == session.evenWeek &&
-          e.location == session.location &&
-          (e.time.last + 1 == session.time.first));
+          sameSchedule(e, session) && (e.time.last + 1 == session.time.first));
       incompleteSession.time.addAll(session.time);
       return false;
     } else {

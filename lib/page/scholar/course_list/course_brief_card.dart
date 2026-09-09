@@ -104,7 +104,8 @@ class CourseBriefCard extends StatelessWidget {
                               .withOpacity(0.5),
                         ),
                         Expanded(
-                            child: Text(' 教师：${course.teacher ?? '未知'}',
+                            child: Text(
+                                ' 教师：${course.teachers.isEmpty ? (course.teacher ?? '未知') : course.teachers.join('、')}',
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.normal,

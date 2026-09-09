@@ -446,6 +446,37 @@ class CalendarPage extends StatelessWidget {
                       ),
                     ],
                   ),
+                  if (period.description.isNotEmpty) ...[
+                    Row(
+                      children: [
+                        Icon(
+                          CupertinoIcons.person_2_alt,
+                          size: 14,
+                          color: CupertinoTheme.of(context)
+                              .textTheme
+                              .textStyle
+                              .color!
+                              .withOpacity(0.5),
+                        ),
+                        const SizedBox(width: 6.0),
+                        Expanded(
+                          child: Text(
+                            period.description,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.normal,
+                              color: CupertinoTheme.of(context)
+                                  .textTheme
+                                  .textStyle
+                                  .color!
+                                  .withOpacity(0.75),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   if (period.location.isNotEmpty) ...[
                     Row(
                       children: [

@@ -315,7 +315,15 @@ class Zdbk {
         continue;
       }
       try {
-        sessions.add(Session.fromZdbk(item));
+        // 缓存合并时给其他课程（实践课）打的标记；这些课程无时间地点，仅进课程列表
+        if (asBool(item['_sjkCourse']) == true) {
+          final qtkcgs =
+              asString(item['qtkcgs']) ?? asString(item['sjkcgs']);
+          if (qtkcgs == null || qtkcgs.trim().isEmpty) continue;
+          sessions.add(Session.fromZdbkSjkList(qtkcgs));
+        } else {
+          sessions.add(Session.fromZdbk(item));
+        }
       } on Object catch (error, stackTrace) {
         if (kDebugMode) {
           debugPrint(
@@ -324,6 +332,17 @@ class Zdbk {
       }
     }
     return sessions;
+  }
+
+  /// 将 kbList 与其他课程 sjkList 合并为统一列表（sjkList 条目打上标记），
+  /// 使实时解析与缓存降级路径使用同一解析器。
+  List<dynamic> _combineTimetableItems(
+      List<dynamic> kbItems, List<dynamic> sjkItems) {
+    return <dynamic>[
+      ...kbItems,
+      for (final item in sjkItems)
+        if (item is Map) {...item, '_sjkCourse': true}
+    ];
   }
 
   List<ExamDto> _parseExams(Object? raw, String context) {
@@ -471,6 +490,10 @@ class Zdbk {
     });
   }
 
+  /// 获取学生个人课表（app 课表页的主数据源）。
+  /// 接口地址以 get_info.py 中 get_schedule 为准：kbcx/xskbcx_cxXsKb.html，
+  /// 响应 JSON 含 xsxx、kbList（kcmc/xm/kch_id/jc/zcd/cdmc/jxbmc/xf/xqj 等字段）
+  /// 与 sjkList（qtkcgs 文本形式的其他课程/实践课）。
   Future<Tuple<Exception?, Iterable<Session>>> getTimetable(
       HttpClient httpClient, String year, String semester) async {
     return await _withAutoRelogin(httpClient, (relogged, retried) async {
@@ -543,8 +566,12 @@ class Zdbk {
                 '$context：缺少 kbList 数组；HTTP ${response.statusCode}'
                 '；响应摘要：${responseSummary(responseText)}');
           }
-          final sessions = _parseSessions(items, context);
-          _writeCache('zdbk_Timetable$year$semester', jsonEncode(items));
+          // 其他课程（实践课等）与 kbList 合并后统一解析并缓存，
+          // 保证缓存降级路径也能还原完整课表。
+          final combined = _combineTimetableItems(
+              items, asDynamicList(payload['sjkList']) ?? const []);
+          final sessions = _parseSessions(combined, context);
+          _writeCache('zdbk_Timetable$year$semester', jsonEncode(combined));
           return Tuple(null, sessions);
         }
         throw ExceptionWithMessage("验证码识别失败");
@@ -824,6 +851,9 @@ class Zdbk {
     throw UnimplementedError("验证码识别功能未开发");
   }
 
+  /// 获取班级课表（兜底数据源，非 app 课表页主数据）。
+  /// 接口为 kbdy/bjkbdy_cxBjKb.html，响应 kbList 条目字段与个人课表接口
+  /// 略有不同（含 zcds 展开周列表、jcs 节次），与个人课表共用同一解析器。
   Future<Tuple<Exception?, List<Session>>> getClassTimetable(
       HttpClient httpClient,
       String year,
@@ -883,7 +913,10 @@ class Zdbk {
             throw ExceptionWithMessage(
                 '$context：缺少 kbList 数组；HTTP ${response.statusCode}');
           }
-          final sessions = _parseSessions(items, context);
+          // 其他课程（实践课等）与 kbList 合并后统一解析
+          final combined = _combineTimetableItems(
+              items, asDynamicList(payload['sjkList']) ?? const []);
+          final sessions = _parseSessions(combined, context);
           return Tuple(null, sessions);
         } on Object catch (error, stackTrace) {
           if (error is AuthenticationExpiredException) rethrow;

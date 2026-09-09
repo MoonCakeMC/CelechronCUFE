@@ -43,7 +43,77 @@ class CourseDetailPage extends StatelessWidget {
   }
 
   Widget createSessionCard(context, List<Session> sessions) {
-    sessions.sort((a, b) => a.time.first.compareTo(b.time.first));
+    // 无排课时间的课程（实践课等）排在最后
+    sessions.sort((a, b) {
+      if (a.time.isEmpty || b.time.isEmpty) {
+        return a.time.isEmpty && b.time.isEmpty ? 0 : a.time.isEmpty ? 1 : -1;
+      }
+      return a.time.first.compareTo(b.time.first);
+    });
+
+    Widget infoRow(IconData icon, String text) {
+      return Row(children: [
+        Icon(
+          icon,
+          size: 14,
+          color: CupertinoTheme.of(context)
+              .textTheme
+              .textStyle
+              .color!
+              .withOpacity(0.5),
+        ),
+        Expanded(
+            child: Text(' $text',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.normal,
+                  color: CupertinoTheme.of(context)
+                      .textTheme
+                      .textStyle
+                      .color!
+                      .withOpacity(0.75),
+                  overflow: TextOverflow.ellipsis,
+                )))
+      ]);
+    }
+
+    // 每个安排分别展示时间、教师与周次，避免多教师分周授课时混淆
+    Widget sessionBlock(Session session) {
+      return Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 12.0,
+                height: 12.0,
+                decoration: BoxDecoration(
+                    color: TimeColors.colorFromClass(
+                        session.time.isEmpty ? 0 : session.time.first),
+                    shape: BoxShape.circle,
+                  ),
+              ),
+              const SizedBox(width: 8.0),
+              Expanded(
+                  child: Text(session.chineseTime,
+                      style: CupertinoTheme.of(context)
+                          .textTheme
+                          .textStyle
+                          .copyWith(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            overflow: TextOverflow.ellipsis,
+                          ))),
+            ],
+          ),
+          const SizedBox(height: 4.0),
+          infoRow(CupertinoIcons.person_2_alt, '教师：${session.teacher}'),
+          infoRow(CupertinoIcons.calendar, '周次：${session.chineseWeeks}'),
+          infoRow(
+              CupertinoIcons.location_solid, '地点：${session.location ?? '未知'}'),
+        ],
+      );
+    }
+
     return Column(
       children: [
         SubSubtitleRow(subtitle: '课时'),
@@ -51,130 +121,18 @@ class CourseDetailPage extends StatelessWidget {
             child: Padding(
           padding: const EdgeInsets.only(left: 8, right: 8),
           child: Column(children: [
-            Row(
-              children: [
-                Expanded(
-                    child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Column(
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 12.0,
-                              height: 12.0,
-                              decoration: BoxDecoration(
-                                color: TimeColors.colorFromClass(
-                                    sessions[0].time.first),
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 8.0),
-                            Expanded(
-                                child: Text(sessions[0].chineseTime,
-                                    style: CupertinoTheme.of(context)
-                                        .textTheme
-                                        .textStyle
-                                        .copyWith(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                          overflow: TextOverflow.ellipsis,
-                                        ))),
-                          ],
-                        ),
-                        const SizedBox(height: 4.0),
-                        Row(children: [
-                          Icon(
-                            CupertinoIcons.location_solid,
-                            size: 14,
-                            color: CupertinoTheme.of(context)
-                                .textTheme
-                                .textStyle
-                                .color!
-                                .withOpacity(0.5),
-                          ),
-                          Expanded(
-                              child: Text(' 地点：${sessions[0].location ?? '未知'}',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.normal,
-                                    color: CupertinoTheme.of(context)
-                                        .textTheme
-                                        .textStyle
-                                        .color!
-                                        .withOpacity(0.75),
-                                    overflow: TextOverflow.ellipsis,
-                                  )))
-                        ]),
-                      ],
-                    ),
-                    for (var i = 1; i < sessions.length; i++)
-                      Column(
-                        children: [
-                          Divider(
-                            height: 24,
-                            thickness: 1,
-                            indent: 0,
-                            endIndent: 0,
-                            color: CupertinoDynamicColor.resolve(
-                                CupertinoColors.systemFill, context),
-                          ),
-                          Row(
-                            children: [
-                              Container(
-                                width: 12.0,
-                                height: 12.0,
-                                decoration: BoxDecoration(
-                                  color: TimeColors.colorFromClass(
-                                      sessions[i].time.first),
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 8.0),
-                              Expanded(
-                                  child: Text(sessions[i].chineseTime,
-                                      style: CupertinoTheme.of(context)
-                                          .textTheme
-                                          .textStyle
-                                          .copyWith(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                            overflow: TextOverflow.ellipsis,
-                                          ))),
-                            ],
-                          ),
-                          const SizedBox(height: 4.0),
-                          Row(children: [
-                            Icon(
-                              CupertinoIcons.location_solid,
-                              size: 14,
-                              color: CupertinoTheme.of(context)
-                                  .textTheme
-                                  .textStyle
-                                  .color!
-                                  .withOpacity(0.5),
-                            ),
-                            Expanded(
-                                child:
-                                    Text(' 地点：${sessions[i].location ?? '未知'}',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.normal,
-                                          color: CupertinoTheme.of(context)
-                                              .textTheme
-                                              .textStyle
-                                              .color!
-                                              .withOpacity(0.75),
-                                          overflow: TextOverflow.ellipsis,
-                                        )))
-                          ]),
-                        ],
-                      )
-                  ],
-                )),
-              ],
-            ),
+            for (var i = 0; i < sessions.length; i++) ...[
+              if (i > 0)
+                Divider(
+                  height: 24,
+                  thickness: 1,
+                  indent: 0,
+                  endIndent: 0,
+                  color: CupertinoDynamicColor.resolve(
+                      CupertinoColors.systemFill, context),
+                ),
+              sessionBlock(sessions[i]),
+            ],
           ]),
         ))
       ],

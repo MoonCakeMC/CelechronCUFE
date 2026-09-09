@@ -334,21 +334,13 @@ class Semester {
     // 自定义第几周上课的课程，在这里处理
     for (var session in _sessions) {
       if (session.customRepeat) {
+        // 无排课时间的其他课程（实践课等）不生成日程
+        if (!session.showOnTimetable) {
+          continue;
+        }
         for (var week in session.customRepeatWeeks) {
-          // (week - 1) ~/ 8 : 判断是上半学期还是下半学期。例如，第8周是上半学期。
-          // 1 - week % 2 : 判断是单周还是双周。例如，第8周是双周。
-          // session.dayOfWeek : 星期X上课
-          // (week - 1) ~/ 2 + 1 : 这是（秋/冬）（单/双）周的第几个星期X。例如，第8周的周二是双周的第4个周二， 第7周的周二是单周的第4个周二。
-
-          // 课程的第几周上课，如果超过16周，就在第16周最后一天的基础上计算。不要问为什么有17周18周的课，我只能说世界之大无奇不有。
-          DateTime day;
-          if (week > 16) {
-            day = _dayOfWeekToDays.last.last.last.last
-                .add(Duration(days: (week - 17) * 7 + session.dayOfWeek));
-          } else {
-            day = _dayOfWeekToDays[(week - 1) ~/ 8][1 - week % 2]
-                [session.dayOfWeek][(week - 1) % 8 ~/ 2];
-          }
+          // 严格按照 zcd 解析出的周次排课：第 week 周就排到学期第 week 周
+          var day = _resolveCustomRepeatDay(week, session.dayOfWeek);
           var period = Period(
               uid:
                   '${session.id}${session.dayOfWeek}${session.time.first}$week',
@@ -396,6 +388,49 @@ class Semester {
     } catch (e) {
       return DateTime.now();
     }
+  }
+
+  /// 上半学期与下半学期日期区间相同时视为长学期（中财）。
+  /// 长学期课程的自定义周次按“学期第 week 周”平铺映射；
+  /// 否则按秋冬学期的上下半学期各 8 周模型映射（浙大研究生）。
+  bool get _isLongSemester {
+    final firstHalf = _dayOfWeekToDays[0][0];
+    final secondHalf = _dayOfWeekToDays[1][0];
+    if (firstHalf[1].isEmpty || secondHalf[1].isEmpty) return false;
+    return firstHalf[1].first == secondHalf[1].first;
+  }
+
+  /// 长学期第 1 周的星期一（学期起始日期所在周的周一）。
+  DateTime get _longSemesterFirstMonday {
+    var earliest = _dayOfWeekToDays[0][0][1].first;
+    for (var weekday = 2; weekday <= 7; weekday++) {
+      final days = _dayOfWeekToDays[0][0][weekday];
+      if (days.isNotEmpty && days.first.isBefore(earliest)) {
+        earliest = days.first;
+      }
+    }
+    return earliest.subtract(Duration(days: earliest.weekday - 1));
+  }
+
+  /// 计算自定义周次课程“第 week 周星期 dayOfWeek”对应的日期。
+  /// 严格按照 zcd 解析出的周次排课，不做额外的半学期换算。
+  DateTime _resolveCustomRepeatDay(int week, int dayOfWeek) {
+    if (_isLongSemester) {
+      // 长学期：第 week 周即学期开始后第 week 周，直接平铺。
+      return _longSemesterFirstMonday
+          .add(Duration(days: (dayOfWeek - 1) + (week - 1) * 7));
+    }
+    if (week <= 16) {
+      final dayList =
+          _dayOfWeekToDays[(week - 1) ~/ 8][1 - week % 2][dayOfWeek];
+      final index = ((week - 1) % 8) ~/ 2;
+      if (dayList.isNotEmpty && index < dayList.length) {
+        return dayList[index];
+      }
+    }
+    // 秋冬学期第 17、18 周或日期数组不足时，基于上一周日期推算
+    return _resolveCustomRepeatDay(week - 1, dayOfWeek)
+        .add(const Duration(days: 7));
   }
 
   void addSession(Session session, String semesterId, [bool isGrs = false]) {

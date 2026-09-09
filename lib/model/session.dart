@@ -32,8 +32,11 @@ class Session {
   bool? online;
   String? type;
 
+  // 是否显示在课表网格中。教务网“其他课程”（实践课等）没有具体时间地点，
+  // 仅进入课程列表，不占用课表网格。
+  bool showOnTimetable = true;
+
   String get semesterId => id!.substring(1, 12);
-  bool get showOnTimetable => true;
 
   static const String dayMap = '零一二三四五六日';
 
@@ -63,10 +66,14 @@ class Session {
   }*/
 
   factory Session.fromZdbk(Map<String, dynamic> json) {
-    // kcb 将课程名、教学班、教师和地点编码在 HTML 换行块中；
-    // xxq 表示半学期，djj/skcd 分别提供起始节次和连续节数。
+    // 中财教务网课表条目解析，兼容两类接口：
+    // 1. 个人课表接口 xskbcx_cxXsKb（app 课表主数据源，字段以 get_info.py
+    //    中 get_schedule 为准：kcmc/xm/kch_id/jc/zcd/cdmc/jxbmc/xf/xqj 等）；
+    // 2. 班级课表接口 bjkbdy_cxBjKb（兜底，含 zcds/jcs 等展开字段）。
+    // 另外保留旧版 zdbk 结构兼容：kcb 将课程名、教学班、教师和地点编码在
+    // HTML 换行块中；xxq 表示半学期，djj/skcd 分别提供起始节次和连续节数。
     final session = Session.empty()
-      ..id = asString(json['jxb_id']) ?? asString(json['kch_id']) ?? asString(json['kch']) ?? asString(json['id'])
+      ..id = asString(json['jxbmc']) ?? asString(json['jxb_id']) ?? asString(json['kch_id']) ?? asString(json['kch']) ?? asString(json['id'])
       ..credit = asDouble(json['xf'])
       ..confirmed = asString(json['sfqd']) != '0'
       ..dayOfWeek = asInt(json['xqj']) ?? 1
@@ -123,19 +130,49 @@ class Session {
       throw const FormatException('课表条目缺少有效节次');
     }
 
+    // 周次：中财接口返回 zcds（已展开的周列表，如 "4,13,14,15,16,17,18"，
+    // 单双周已体现在列表中），优先使用；否则回退解析 zcd 字符串。
+    final zcds = asString(json['zcds']);
     final zcd = asString(json['zcd']);
-    if (zcd != null && zcd.isNotEmpty) {
+    if (zcds != null && zcds.isNotEmpty) {
+      session.customRepeat = true;
+      session.customRepeatWeeks = _parseZcds(zcds);
+    } else if (zcd != null && zcd.isNotEmpty) {
       session.customRepeat = true;
       session.customRepeatWeeks = _parseZcd(zcd);
+    }
+    // 若接口同时提供 dsz（0=双周，1=单周），按单双周过滤展开的周列表，
+    // 防止 zcd 未标注单双周时把全部周次都当作上课周。
+    final dsz = asString(json['dsz']);
+    if (session.customRepeatWeeks.isNotEmpty && (dsz == '0' || dsz == '1')) {
+      session.customRepeatWeeks = session.customRepeatWeeks
+          .where((week) => dsz == '0' ? week.isEven : week.isOdd)
+          .toList();
     }
 
     return session;
   }
 
+  /// 解析中财接口返回的 zcds 字段（逗号分隔的已展开周次列表，如 "4,13,14,15"）
+  static List<int> _parseZcds(String zcds) {
+    final weeks = <int>{};
+    for (var part in zcds.split(',')) {
+      part = part.replaceAll('\u5468', '').trim();
+      final w = int.tryParse(part);
+      if (w != null) weeks.add(w);
+    }
+    final sorted = weeks.toList()..sort();
+    return sorted;
+  }
+
   static List<int> _parseZcd(String zcd) {
     final weeks = <int>{};
     for (var part in zcd.split(',')) {
-      part = part.replaceAll('\u5468', '').trim();
+      // 清理“周”“第”“单”“双”等中文标记，保留纯数字或数字范围
+      part = part
+          .replaceAll('\u5468', '') // 周
+          .replaceAll('\u7b2c', '') // 第
+          .trim();
       bool onlyOdd = part.contains('(\u5355)');
       bool onlyEven = part.contains('(\u53cc)');
       part = part.replaceAll('(\u5355)', '').replaceAll('(\u53cc)', '').trim();
@@ -161,6 +198,46 @@ class Session {
     return sorted;
   }
 
+  /// 解析中财课表接口 sjkList 中的“其他课程”（实践课等，无具体时间地点）。
+  /// 文本格式示例：“大学生安全教育★董笑含(共15周)/4-18周”
+  factory Session.fromZdbkSjkList(String qtkcgs) {
+    final session = Session.empty()
+      ..confirmed = true
+      ..dayOfWeek = 1
+      ..time = <int>[]
+      ..location = '未排地点'
+      ..customRepeat = true
+      ..customRepeatWeeks = <int>[];
+
+    // 提取周次部分（“/”之后的内容，如 “4-18周” 或 “11-13周”）
+    final slashIndex = qtkcgs.indexOf('/');
+    final weekText = slashIndex >= 0 ? qtkcgs.substring(slashIndex + 1) : '';
+    if (weekText.isNotEmpty) {
+      session.customRepeatWeeks = _parseZcd(weekText);
+    }
+
+    // 提取课程名与教师。格式为“课程名★教师名(共N周)”，
+    // 课程名与教师以 ★（讲课）或 ●（实践）分隔。
+    final namePart = slashIndex >= 0 ? qtkcgs.substring(0, slashIndex) : qtkcgs;
+    final bracketIndex = namePart.indexOf('(');
+    final nameTeacher = bracketIndex >= 0
+        ? namePart.substring(0, bracketIndex)
+        : namePart;
+    final segments =
+        nameTeacher.split(RegExp('[\u2605\u25cf]')).map((e) => e.trim());
+    var name = segments.isEmpty ? '' : segments.first;
+    var teacher = segments.length > 1 ? segments.elementAt(1) : '';
+    if (name.isEmpty) name = namePart.trim().isEmpty ? '未知课程' : namePart.trim();
+    session.name = name.replaceAll('(', '\uff08').replaceAll(')', '\uff09');
+    session.teacher = teacher.isEmpty
+        ? '未知教师'
+        : teacher.replaceAll('(', '\uff08').replaceAll(')', '\uff09');
+    session.id = '${session.name}${session.teacher}';
+    // 其他课程没有排课时间，不显示在课表网格中
+    session.showOnTimetable = false;
+    return session;
+  }
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,
@@ -179,6 +256,7 @@ class Session {
         'credit': credit,
         'online': online,
         'type': type,
+        'showOnTimetable': showOnTimetable,
       };
 
   Session.fromJson(Map<String, dynamic> json)
@@ -205,9 +283,12 @@ class Session {
                 .toList(),
         credit = asDouble(json['credit']),
         online = asBool(json['online']),
-        type = asString(json['type']);
+        type = asString(json['type']),
+        showOnTimetable = asBool(json['showOnTimetable']) ?? true;
 
   String get chineseTime {
+    // 其他课程（实践课等）没有排课时间，直接返回提示
+    if (time.isEmpty) return '时间未排';
     var timeString =
         '${(oddWeek & evenWeek) ? '' : oddWeek ? '单 - ' : '双 - '}周${dayMap[dayOfWeek]}第';
     for (var i = 0; i < time.length; i++) {
@@ -219,5 +300,34 @@ class Session {
     timeString.trimRight();
     timeString += '节';
     return timeString;
+  }
+
+  /// 紧凑的周次描述，如“4-18周”“第4周”“4周,13-18周”。
+  /// 严格按 customRepeatWeeks 展示，不做任何推算。
+  String get chineseWeeks {
+    if (customRepeatWeeks.isEmpty) {
+      return oddWeek && evenWeek
+          ? '每周'
+          : oddWeek
+              ? '单周'
+              : evenWeek
+                  ? '双周'
+                  : '无';
+    }
+    final parts = <String>[];
+    var start = customRepeatWeeks.first;
+    var prev = start;
+    for (var i = 1; i < customRepeatWeeks.length; i++) {
+      final week = customRepeatWeeks[i];
+      if (week == prev + 1) {
+        prev = week;
+        continue;
+      }
+      parts.add(start == prev ? '第$start周' : '$start-$prev周');
+      start = week;
+      prev = week;
+    }
+    parts.add(start == prev ? '第$start周' : '$start-$prev周');
+    return parts.join(',');
   }
 }

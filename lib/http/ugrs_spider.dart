@@ -494,6 +494,14 @@ class UgrsSpider implements Spider {
             if (a.dayOfWeek != b.dayOfWeek) {
               return a.dayOfWeek.compareTo(b.dayOfWeek);
             } else {
+              // 无排课时间的其他课程（实践课等）排在最后
+              if (a.time.isEmpty || b.time.isEmpty) {
+                return a.time.isEmpty && b.time.isEmpty
+                    ? 0
+                    : a.time.isEmpty
+                        ? 1
+                        : -1;
+              }
               return a.time.first.compareTo(b.time.first);
             }
           });
