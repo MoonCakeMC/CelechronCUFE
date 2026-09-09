@@ -173,9 +173,9 @@ class _SessionCardState extends State<SessionCard>
                         sessionName,
                         textAlign: TextAlign.center,
                         maxLines: widget.sessionList.length == 1
-                            ? 3 // 单课程最�?�?
+                            ? 3 // 单课程最多行
                             : (widget.sessionList.length * 2)
-                                .clamp(2, 6), // 冲突课程最�?�?
+                                .clamp(2, 6), // 冲突课程最多行
                         overflow: TextOverflow.ellipsis,
                         style: CupertinoTheme.of(context)
                             .textTheme

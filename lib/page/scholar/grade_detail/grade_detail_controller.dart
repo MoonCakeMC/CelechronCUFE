@@ -44,7 +44,7 @@ class GradeDetailController extends GetxController {
 
   Tuple<List<double>, double> getYearMajorGpa(int semesterIndex) {
     // 提取当前学期的学年 ID，例如 "2022-2023"
-    final yearId = semestersWithGrades[semesterIndex].name.substring(0, 9);
+    final yearId = semestersWithGrades[semesterIndex].yearId;
 
     // 获取该学年的所有主修课程
     final majorGrades = scholar.value.grades.values

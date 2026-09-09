@@ -113,7 +113,7 @@ class WeightedGpaPage extends StatelessWidget {
                           withColoredFont: true,
                           width: 120,
                           title:
-                              '${semester.name.substring(2, 5)}${semester.name.substring(7, 11)}',
+                              '${semester.shortName}',
                           content:
                               '${semester.gpa[0].toStringAsFixed(2)}/${semester.credits.toStringAsFixed(1)}',
                           onTap: () {

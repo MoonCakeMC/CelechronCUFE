@@ -52,7 +52,7 @@ class CourseSchedulePage extends StatelessWidget {
                           children: [
                             AnimateButton(
                               text:
-                                  '${semester.name.substring(2, 5)}${semester.name.substring(7, 11)}',
+                                  '${semester.shortName}',
                               onTap: () {
                                 _courseScheduleController.semesterIndex.value =
                                     index;
@@ -94,7 +94,7 @@ class CourseSchedulePage extends StatelessWidget {
                             '${_courseScheduleController.semester.firstHalfSessionCount}节/两周',
                         backgroundColor: _courseScheduleController
                                 .firstOrSecondSemester.value
-                            ? _courseScheduleController.semester.name[9] == '春'
+                            ? _courseScheduleController.semester.firstHalfName == '春'
                                 ? CustomCupertinoDynamicColors.spring
                                 : CustomCupertinoDynamicColors.autumn
                             : CupertinoColors.systemFill,
@@ -115,7 +115,7 @@ class CourseSchedulePage extends StatelessWidget {
                         backgroundColor: _courseScheduleController
                                 .firstOrSecondSemester.value
                             ? CupertinoColors.systemFill
-                            : _courseScheduleController.semester.name[9] == '春'
+                            : _courseScheduleController.semester.firstHalfName == '春'
                                 ? CustomCupertinoDynamicColors.summer
                                 : CustomCupertinoDynamicColors.winter,
                         withColoredFont: true),

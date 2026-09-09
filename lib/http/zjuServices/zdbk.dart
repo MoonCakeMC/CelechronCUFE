@@ -311,7 +311,6 @@ class Zdbk {
     for (var index = 0; index < items.length; index++) {
       final item = asStringMap(items[index]);
       if (item == null ||
-          item['kcb'] == null ||
           asString(item['sfyjskc']) == '1') {
         continue;
       }
@@ -860,7 +859,7 @@ class Zdbk {
               charset: 'utf-8');
           
           final bodyBytes = utf8.encode(
-              'xnm=$year&xqm=$semester&xnmc=2026-2027&xqmmc=1&xqh_id=2&njdm_id=$njdmId&zyh_id=$zyhId&bh_id=$bhId&tjkbzdm=1&tjkbzxsdm=0&zymc=&jgmc=&njmc=2026&bj=&xkrs=29&bh=$bh&zxszjjs=false&akcxqjchb=false&kzlx=ck&sfcxxqh=1');
+              'xnm=$year&xqm=$semester&xnmc=$year&xqmmc=1&xqh_id=2&njdm_id=$njdmId&zyh_id=$zyhId&bh_id=$bhId&tjkbzdm=1&tjkbzxsdm=0&zymc=&jgmc=&njmc=2026&bj=&xkrs=29&bh=$bh&zxszjjs=false&akcxqjchb=false&kzlx=ck&sfcxxqh=1');
           request.headers.contentLength = bodyBytes.length;
           request.add(bodyBytes);
           response = await request.close().timeout(const Duration(seconds: 8),

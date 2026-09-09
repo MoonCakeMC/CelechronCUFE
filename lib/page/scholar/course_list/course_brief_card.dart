@@ -16,7 +16,7 @@ class CourseBriefCard extends StatelessWidget {
     return RoundRectangleCard(
         onTap: allowDirect
             ? () async => Navigator.of(context).push(CupertinoPageRoute(
-                builder: (context) => CourseDetailPage(courseId: course.id)))
+                builder: (context) => CourseDetailPage(courseId: course.id, initialCourse: course)))
             : null,
         child: Padding(
           padding: const EdgeInsets.only(left: 8, right: 8),

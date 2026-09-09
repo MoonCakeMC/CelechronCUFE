@@ -59,9 +59,13 @@ class Course {
   }
   // used for zdbk
   Course.fromUgrsSessionWithoutID(Session session) {
+    id = session.id;
     name = session.name;
     confirmed = session.confirmed;
     teacher = session.teacher;
+    if (session.credit != null) {
+      credit = session.credit!;
+    }
     sessions.add(session);
   }
 

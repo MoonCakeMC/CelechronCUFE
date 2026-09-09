@@ -353,11 +353,11 @@ class UgrsSpider implements Spider {
     // 大一开学考的学期是入学的前一学期
     for (var i = 7, j = 0; i >= -1; i--, j++) {
       semesterIndexMap.addEntries(
-          [MapEntry('${yearEnroll + i}-${yearEnroll + i + 1}-2', j * 2)]);
+          [MapEntry('${yearEnroll + i}-2', j * 2)]);
       semesterIndexMap.addEntries(
-          [MapEntry('${yearEnroll + i}-${yearEnroll + i + 1}-1', j * 2 + 1)]);
-      outSemesters.add(Semester('${yearEnroll + i}-${yearEnroll + i + 1}春夏'));
-      outSemesters.add(Semester('${yearEnroll + i}-${yearEnroll + i + 1}秋冬'));
+          [MapEntry('${yearEnroll + i}-1', j * 2 + 1)]);
+      outSemesters.add(Semester('${yearEnroll + i}春'));
+      outSemesters.add(Semester('${yearEnroll + i}秋'));
     }
 
     var semesterConfigFetches = <Future<String?>>[];
@@ -372,8 +372,7 @@ class UgrsSpider implements Spider {
       // normalUpperBound 内保持历史/当前抓取；其后的 probeUpperBound
       // 无条件尝试下一学年，以接口是否有有效数据判断是否开放。
       final isProbeYear = timetableYearPlan.isProbeYear(queryAcademicYearStart);
-      final queryAcademicYear =
-          '$queryAcademicYearStart-${queryAcademicYearStart + 1}';
+      final queryAcademicYear = '$queryAcademicYearStart';
       var probeSessionCount = 0;
       var probeHadUnexpectedFailure = false;
 
@@ -524,7 +523,7 @@ class UgrsSpider implements Spider {
         }
       }
 
-      for (var season in ['1|秋', '1|冬', '2|春', '2|夏']) {
+      for (var season in ['1', '2']) {
         if (timetableFetches.isEmpty) {
           timetableFetches.add(handleTimetable(season));
         } else {

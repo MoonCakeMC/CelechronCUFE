@@ -16,10 +16,30 @@ class CourseDetailPage extends StatelessWidget {
   final _scholar = Get.find<Rx<Scholar>>(tag: 'scholar');
   late final Course course;
 
-  CourseDetailPage({required courseId, super.key}) {
-    course = _scholar.value.semesters
-        .firstWhere((e) => e.courses.containsKey(courseId))
-        .courses[courseId]!;
+  CourseDetailPage({String? courseId, Course? initialCourse, super.key}) {
+    if (initialCourse != null) {
+      course = initialCourse;
+      return;
+    }
+    
+    Course? found;
+    if (courseId != null) {
+      for (var sem in _scholar.value.semesters) {
+        if (sem.courses.containsKey(courseId)) {
+          found = sem.courses[courseId];
+          break;
+        }
+        for (var c in sem.courses.values) {
+          if (c.id == courseId || c.realId == courseId) {
+            found = c;
+            break;
+          }
+        }
+        if (found != null) break;
+      }
+    }
+    // Fallback if not found
+    course = found ?? Course.fromUgrsSessionWithoutID(Session.empty());
   }
 
   Widget createSessionCard(context, List<Session> sessions) {

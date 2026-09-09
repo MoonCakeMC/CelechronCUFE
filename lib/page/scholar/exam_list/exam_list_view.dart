@@ -302,7 +302,7 @@ class _ExamListPageState extends State<ExamListPage> {
                       return Obx(() => Stack(children: [
                             AnimateButton(
                               text:
-                                  '${semester.name.substring(2, 5)}${semester.name.substring(7, 11)}',
+                                  '${semester.shortName}',
                               onTap: () {
                                 _examListController.semesterIndex.value = index;
                                 _examListController.semesterIndex.refresh();

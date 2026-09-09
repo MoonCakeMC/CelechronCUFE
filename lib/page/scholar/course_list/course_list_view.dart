@@ -36,7 +36,7 @@ class CourseListPage extends StatelessWidget {
                     return Obx(() => Stack(children: [
                           AnimateButton(
                             text:
-                                '${semester.name.substring(2, 5)}${semester.name.substring(7, 11)}',
+                                '${semester.shortName}',
                             onTap: () {
                               _courseListController.semesterIndex.value = index;
                               _courseListController.semesterIndex.refresh();

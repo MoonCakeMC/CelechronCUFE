@@ -490,7 +490,7 @@ class ScholarPage extends StatelessWidget {
                                       content:
                                           '${_scholarController.selectedSemester.firstHalfSessionCount}节/两周',
                                       backgroundColor: _scholarController
-                                                  .selectedSemester.name[9] ==
+                                                  .selectedSemester.firstHalfName ==
                                               '春'
                                           ? CustomCupertinoDynamicColors.spring
                                           : CustomCupertinoDynamicColors.autumn,
@@ -518,7 +518,7 @@ class ScholarPage extends StatelessWidget {
                                       content:
                                           '${_scholarController.selectedSemester.secondHalfSessionCount}节/两周',
                                       backgroundColor: _scholarController
-                                                  .selectedSemester.name[9] ==
+                                                  .selectedSemester.firstHalfName ==
                                               '春'
                                           ? CustomCupertinoDynamicColors.summer
                                           : CustomCupertinoDynamicColors.winter,
@@ -874,7 +874,7 @@ class ScholarPage extends StatelessWidget {
                                     Obx(
                                       () => AnimateButton(
                                         text:
-                                            '${semester.name.substring(2, 5)}${semester.name.substring(7, 11)}',
+                                            '${semester.shortName}',
                                         onTap: () {
                                           _scholarController
                                               .semesterIndex.value = index;

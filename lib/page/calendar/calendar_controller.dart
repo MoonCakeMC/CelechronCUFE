@@ -28,12 +28,19 @@ class CalendarController extends GetxController {
     if (semester == null) return '考试周/假期';
 
     var toFirstWeek = day.difference(semester.firstDay).inDays ~/ 7;
-    if (toFirstWeek < 8) {
-      return '${semester.name[9]}${numToChinese[toFirstWeek]}周';
+    // 如果是类似中财的长学期（无第二半学期），直接显示“第x周”
+    if (semester.secondHalfName == '') {
+      return '${semester.firstHalfName}学期 第${toFirstWeek + 1}周';
     }
+
+    // 浙大短学期逻辑
+    if (toFirstWeek >= 0 && toFirstWeek < 8) {
+      return '${semester.firstHalfName}${numToChinese[toFirstWeek]}周';
+    }
+    
     var toLastWeek = 7 - semester.lastDay.difference(day).inDays ~/ 7;
-    if (toLastWeek < 8) {
-      return '${semester.name[10]}${numToChinese[toLastWeek]}周';
+    if (toLastWeek >= 0 && toLastWeek < 8) {
+      return '${semester.secondHalfName}${numToChinese[toLastWeek]}周';
     }
     return '考试周/假期';
   }
@@ -108,8 +115,7 @@ class CalendarController extends GetxController {
     if (semester == null) return '无学期信息';
 
     final isFirstHalf = isFirstHalfSemester(semester);
-    final semesterName =
-        '${semester.name.substring(2, 5)}${semester.name.substring(7, 11)}';
+    final semesterName = semester.shortName;
     final halfName =
         isFirstHalf ? semester.firstHalfName : semester.secondHalfName;
     return '$semesterName $halfName学期';

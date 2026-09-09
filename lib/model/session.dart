@@ -13,8 +13,9 @@ class Session {
   // firstHalf : 秋/春 需要上课
   // secondHalf: 夏/冬 需要上课
   // 举例：秋冬学期的课程，firstHalf为true，secondHalf也为true
-  bool firstHalf = false;
-  bool secondHalf = false;
+  // CUFE 只有一个学段，默认全覆盖
+  bool firstHalf = true;
+  bool secondHalf = true;
 
   // oddWeek:  单周 需要上课
   // evenWeek: 双周 需要上课
@@ -32,7 +33,7 @@ class Session {
   String? type;
 
   String get semesterId => id!.substring(1, 12);
-  bool get showOnTimetable => !customRepeat || customRepeatWeeks.length >= 3;
+  bool get showOnTimetable => true;
 
   static const String dayMap = '零一二三四五六日';
 
@@ -65,7 +66,9 @@ class Session {
     // kcb 将课程名、教学班、教师和地点编码在 HTML 换行块中；
     // xxq 表示半学期，djj/skcd 分别提供起始节次和连续节数。
     final session = Session.empty()
-      ..confirmed = asString(json['sfqd']) == '1'
+      ..id = asString(json['jxb_id']) ?? asString(json['kch_id']) ?? asString(json['kch']) ?? asString(json['id'])
+      ..credit = asDouble(json['xf'])
+      ..confirmed = asString(json['sfqd']) != '0'
       ..dayOfWeek = asInt(json['xqj']) ?? 1
       ..oddWeek = asString(json['dsz']) != '1'
       ..evenWeek = asString(json['dsz']) != '0'
@@ -101,11 +104,61 @@ class Session {
     final duration = asInt(json['skcd']);
     if (initial != null && duration != null && duration > 0) {
       session.time = List<int>.generate(duration, (index) => initial + index);
+    } else {
+      final jcs = asString(json['jcs']) ?? asString(json['jc']);
+      if (jcs != null) {
+        final matchRange = RegExp(r'(\d+)-(\d+)').firstMatch(jcs);
+        final matchSingle = RegExp(r'^(\d+)').firstMatch(jcs);
+        if (matchRange != null) {
+          final start = int.parse(matchRange.group(1)!);
+          final end = int.parse(matchRange.group(2)!);
+          session.time = List<int>.generate(end - start + 1, (index) => start + index);
+        } else if (matchSingle != null) {
+          final val = int.parse(matchSingle.group(1)!);
+          session.time = [val];
+        }
+      }
     }
     if (session.time.isEmpty) {
       throw const FormatException('课表条目缺少有效节次');
     }
+
+    final zcd = asString(json['zcd']);
+    if (zcd != null && zcd.isNotEmpty) {
+      session.customRepeat = true;
+      session.customRepeatWeeks = _parseZcd(zcd);
+    }
+
     return session;
+  }
+
+  static List<int> _parseZcd(String zcd) {
+    final weeks = <int>{};
+    for (var part in zcd.split(',')) {
+      part = part.replaceAll('\u5468', '').trim();
+      bool onlyOdd = part.contains('(\u5355)');
+      bool onlyEven = part.contains('(\u53cc)');
+      part = part.replaceAll('(\u5355)', '').replaceAll('(\u53cc)', '').trim();
+      if (part.contains('-')) {
+        final bounds = part.split('-');
+        if (bounds.length == 2) {
+          final start = int.tryParse(bounds[0]) ?? 0;
+          final end = int.tryParse(bounds[1]) ?? 0;
+          if (start > 0 && end >= start) {
+            for (var w = start; w <= end; w++) {
+              if (onlyOdd && w % 2 == 0) continue;
+              if (onlyEven && w % 2 == 1) continue;
+              weeks.add(w);
+            }
+          }
+        }
+      } else {
+        final w = int.tryParse(part);
+        if (w != null) weeks.add(w);
+      }
+    }
+    final sorted = weeks.toList()..sort();
+    return sorted;
   }
 
   Map<String, dynamic> toJson() => {

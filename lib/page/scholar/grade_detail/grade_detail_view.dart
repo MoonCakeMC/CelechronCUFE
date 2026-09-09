@@ -24,7 +24,7 @@ class GradeDetailPage extends StatelessWidget {
         i < _gradeDetailController.semestersWithGrades.length;
         i++) {
       if (i != idx &&
-          _gradeDetailController.semestersWithGrades[i].name.substring(2, 5) ==
+          _gradeDetailController.semestersWithGrades[i].startYearShort ==
               _gradeDetailController.semestersWithGrades[idx].name
                   .substring(2, 5)) {
         return i;
@@ -296,7 +296,7 @@ class GradeDetailPage extends StatelessWidget {
                                       withColoredFont: true,
                                       width: 120,
                                       title:
-                                          '${semester.name.substring(2, 5)}${semester.name.substring(7, 11)}',
+                                          '${semester.shortName}',
                                       content: _gradeDetailController
                                               .customGpaMode.value
                                           ? '${getSelectedGradeCount(semester)} / ${semester.grades.length}'

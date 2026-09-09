@@ -4,7 +4,7 @@ import 'package:celechron/http/zjuServices/response_utils.dart';
 import 'package:celechron/model/semester.dart';
 import 'package:flutter/foundation.dart';
 
-const calendarConfigBaseUrl = 'http://calendar.celechron.top/';
+const calendarConfigBaseUrl = 'https://oss-2.147483648.xyz/celechroncufe/';
 
 /// 返回日期所属学年的起始年份；九月是学年边界，不代表课表开放时间。
 int academicYearStartFor(DateTime now) =>
@@ -71,10 +71,12 @@ bool isExpectedTimetableProbeMiss(Object? error) {
 }
 
 String calendarObjectKeyForSemester(String semesterId) {
-  if (!RegExp(r'^\d{4}-\d{4}-[12]$').hasMatch(semesterId)) {
+  if (!RegExp(r'^\d{4}(?:-\d{4})?-[12]$').hasMatch(semesterId)) {
     throw FormatException('无效的学年学期：$semesterId');
   }
-  return '$semesterId.json';
+  final parts = semesterId.split('-');
+  final year = int.parse(parts[0]);
+  return '$year-${year + 1}.json';
 }
 
 Uri calendarConfigUriForSemester(String semesterId) {
@@ -88,12 +90,23 @@ Map<String, dynamic> decodeAndValidateCalendarConfig(
 }) {
   // startEnd 依次供两个半学期计算日期；sessionTime 的下标与节次直接对应。
   final config = decodeJsonMap(rawConfig, context: context);
-  final startEnd = asDynamicList(config['startEnd']);
+  var startEnd = asDynamicList(config['startEnd']);
+  
+  if (startEnd != null && startEnd.length == 4) {
+    if (context.contains('-1')) {
+      startEnd = [startEnd[0], startEnd[1], startEnd[0], startEnd[1]];
+      config['startEnd'] = startEnd;
+    } else if (context.contains('-2')) {
+      startEnd = [startEnd[2], startEnd[3], startEnd[2], startEnd[3]];
+      config['startEnd'] = startEnd;
+    }
+  }
+
   final sessionTime = asDynamicList(config['sessionTime']);
   if (startEnd == null || startEnd.length != 4) {
     throw FormatException('$context：startEnd 应包含四个日期');
   }
-  if (sessionTime == null || sessionTime.length < 15) {
+  if (sessionTime == null || sessionTime.length < 10) {
     throw FormatException('$context：sessionTime 缺失或节次数不足');
   }
   return config;

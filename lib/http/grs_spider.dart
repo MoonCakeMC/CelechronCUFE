@@ -307,11 +307,11 @@ class GrsSpider implements Spider {
     Map<String, int> semesterIndexMap = <String, int>{};
     for (var i = 9, j = 0; i >= 0; i--, j++) {
       semesterIndexMap.addEntries(
-          [MapEntry('${yearEnroll + i}-${yearEnroll + i + 1}-2', j * 2)]);
+          [MapEntry('${yearEnroll + i}-2', j * 2)]);
       semesterIndexMap.addEntries(
-          [MapEntry('${yearEnroll + i}-${yearEnroll + i + 1}-1', j * 2 + 1)]);
-      outSemesters.add(Semester('${yearEnroll + i}-${yearEnroll + i + 1}春夏'));
-      outSemesters.add(Semester('${yearEnroll + i}-${yearEnroll + i + 1}秋冬'));
+          [MapEntry('${yearEnroll + i}-1', j * 2 + 1)]);
+      outSemesters.add(Semester('${yearEnroll + i}春'));
+      outSemesters.add(Semester('${yearEnroll + i}秋'));
     }
 
     // 查校历（存在CDN上，JSON格式的，内含学期起止日期、单日时间表、放假调休等信息）
@@ -327,7 +327,7 @@ class GrsSpider implements Spider {
 
     while (
         yearEnroll <= currentAcademicYearStart && yearEnroll <= yearGraduate) {
-      var queryAcademicYear = '$yearEnroll-${yearEnroll + 1}';
+      var queryAcademicYear = '$yearEnroll';
       semesterConfigFetches.add(_timeConfigService
           .getConfig(_httpClient, '$queryAcademicYear-1')
           .then((value) {
@@ -441,7 +441,7 @@ class GrsSpider implements Spider {
         }
       }
 
-      for (var season in ['1|秋', '1|冬', '2|春', '2|夏']) {
+      for (var season in ['1', '2']) {
         if (timetableFetches.isEmpty) {
           timetableFetches.add(handleTimetable(season));
         } else {
@@ -608,7 +608,7 @@ class GrsSpider implements Spider {
           } else {
             throw const FormatException('缺少学期名称');
           }
-          final queryAcademicYear = '$year-${year + 1}$semesterStr';
+          final queryAcademicYear = '$year$semesterStr';
           final classId = RegExp(r'班级编号(\d{7})').firstMatch(e.id)?.group(1);
           final index = semesterIndexMap[queryAcademicYear];
           if (classId == null || index == null) {

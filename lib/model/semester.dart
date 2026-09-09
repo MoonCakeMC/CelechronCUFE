@@ -69,11 +69,28 @@ class Semester {
         _sessions = [];
 
   String get firstHalfName {
+    if (name.length < 10) return name.length > 4 ? name.substring(4) : name;
     return name.substring(9, 10);
   }
 
   String get secondHalfName {
+    if (name.length < 11) return '';
     return name.substring(10, 11);
+  }
+
+  String get shortName {
+    if (name.length < 10) return name.length > 2 ? name.substring(2) : name;
+    return '${name.substring(2, 5)}${name.substring(7, 11)}';
+  }
+
+  String get yearId {
+    if (name.length < 9) return name;
+    return name.substring(0, 9);
+  }
+
+  String get startYearShort {
+    if (name.length < 5) return name;
+    return name.substring(2, 5);
   }
 
   // 课程数据
