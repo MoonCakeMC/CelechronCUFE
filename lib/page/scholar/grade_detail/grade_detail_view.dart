@@ -34,6 +34,11 @@ class GradeDetailPage extends StatelessWidget {
   }
 
   Tuple<List<double>, double> getYearStats(int semesterIndex) {
+    if (_gradeDetailController.semestersWithGrades.isEmpty ||
+        semesterIndex < 0 ||
+        semesterIndex >= _gradeDetailController.semestersWithGrades.length) {
+      return Tuple([0.0, 0.0, 0.0], 0.0);
+    }
     var s1 = _gradeDetailController.semestersWithGrades[semesterIndex];
     int another = getPairedSemesterIndex(semesterIndex);
     if (another == semesterIndex) {
@@ -295,8 +300,7 @@ class GradeDetailPage extends StatelessWidget {
                                       animate: true,
                                       withColoredFont: true,
                                       width: 120,
-                                      title:
-                                          '${semester.shortName}',
+                                      title: '${semester.shortName}',
                                       content: _gradeDetailController
                                               .customGpaMode.value
                                           ? '${getSelectedGradeCount(semester)} / ${semester.grades.length}'
@@ -465,11 +469,13 @@ class GradeDetailPage extends StatelessWidget {
                     ],
                   );
                 },
-                childCount: _gradeDetailController
-                    .semestersWithGrades[
-                        _gradeDetailController.semesterIndex.value]
-                    .grades
-                    .length,
+                childCount: _gradeDetailController.semestersWithGrades.isEmpty
+                    ? 0
+                    : _gradeDetailController
+                        .semestersWithGrades[
+                            _gradeDetailController.semesterIndex.value]
+                        .grades
+                        .length,
               ),
             ),
           ),

@@ -39,6 +39,8 @@ dependencies:
   device_calendar:
   timezone:
   device_info_plus:
+  file_picker: ^11.0.3
+  file_selector: ^1.0.3
 
 dev_dependencies:
   flutter_test:

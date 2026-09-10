@@ -407,6 +407,7 @@ class UgrsSpider implements Spider {
             value.item2!,
             outSemesters[semesterIndexMap['$queryAcademicYear-1']!],
             outSpecialDates,
+            semesterId: '$queryAcademicYear-1',
             context: '校历（学年学期 $queryAcademicYear-1）',
           );
         }
@@ -426,6 +427,19 @@ class UgrsSpider implements Spider {
             details:
                 value.item1 == null ? null : detailedErrorText(value.item1),
           );
+        }
+        if (value.item3 == DataSourceStatus.unavailable) {
+          // 无缓存且远程不可用：探测学年未发布属正常，其余学年报错禁用
+          if (isProbeYear) {
+            DiagnosticLogService.instance.record(
+              level: CelechronLogLevel.warning,
+              module: '校历',
+              operation: 'futureProbe',
+              message: '未来学年校历未发布且无缓存：$queryAcademicYear-1',
+            );
+            return null;
+          }
+          return value.item1?.toString();
         }
         return value.item1?.toString();
       }).catchError((Object error, StackTrace stackTrace) =>
@@ -451,6 +465,7 @@ class UgrsSpider implements Spider {
             value.item2!,
             outSemesters[semesterIndexMap['$queryAcademicYear-2']!],
             outSpecialDates,
+            semesterId: '$queryAcademicYear-2',
             context: '校历（学年学期 $queryAcademicYear-2）',
           );
         }
@@ -470,6 +485,19 @@ class UgrsSpider implements Spider {
             details:
                 value.item1 == null ? null : detailedErrorText(value.item1),
           );
+        }
+        if (value.item3 == DataSourceStatus.unavailable) {
+          // 无缓存且远程不可用：探测学年未发布属正常，其余学年报错禁用
+          if (isProbeYear) {
+            DiagnosticLogService.instance.record(
+              level: CelechronLogLevel.warning,
+              module: '校历',
+              operation: 'futureProbe',
+              message: '未来学年校历未发布且无缓存：$queryAcademicYear-2',
+            );
+            return null;
+          }
+          return value.item1?.toString();
         }
         return value.item1?.toString();
       }).catchError((Object error, StackTrace stackTrace) =>

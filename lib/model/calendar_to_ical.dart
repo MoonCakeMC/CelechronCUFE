@@ -1,9 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
+import 'package:file_picker/file_picker.dart';
 import 'package:crypto/crypto.dart';
-import 'package:device_info_plus/device_info_plus.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:celechron/model/location_mapper.dart';
 import 'package:celechron/model/period.dart';
 import 'package:celechron/model/scholar.dart';
@@ -27,7 +26,6 @@ import 'package:get/get.dart';
 /// - [_generateHash]: 生成事件唯一标识
 /// - [_showAlert]: 显示提示弹窗
 /// - [_isIPad]: 判断是否为 iPad
-/// - [_calculateSharePositionOrigin]: 计算分享位置（iPad必需）
 
 class CalendarToIcal {
   /// 将DateTime转换为iCal格式的时间字符串
@@ -168,28 +166,6 @@ class CalendarToIcal {
     );
   }
 
-  /// 判断是否为 iPad
-  static Future<bool> _isIPad() async {
-    if (!Platform.isIOS) return false;
-    final deviceInfo = DeviceInfoPlugin();
-    final iosInfo = await deviceInfo.iosInfo;
-    return iosInfo.model.toLowerCase().contains('ipad');
-  }
-
-  /// 计算分享位置（iPad 必需）
-  static Future<Rect?> _calculateSharePositionOrigin(
-      BuildContext? context) async {
-    if (context == null) return null;
-    if (!(await _isIPad())) return null;
-    // 检查 context 是否仍然有效（避免在 async gap 后使用无效的 context）
-    if (!context.mounted) return null;
-    final box = context.findRenderObject() as RenderBox?;
-    if (box != null && box.hasSize) {
-      return box.localToGlobal(Offset.zero) & box.size;
-    }
-    return null;
-  }
-
   /// 从Scholar对象生成iCal
   static String generateIcalFromScholar({
     required Scholar scholar,
@@ -248,7 +224,6 @@ class CalendarToIcal {
       }
 
       // 在异步操作前计算分享位置，避免跨异步间隙使用 BuildContext
-      final sharePositionOrigin = await _calculateSharePositionOrigin(context);
 
       // 生成iCal内容
       final icalContent = generateIcalFromScholar(
@@ -257,26 +232,20 @@ class CalendarToIcal {
         includeExams: true,
       );
 
-      // 获取应用文档目录
-      final directory = await getApplicationDocumentsDirectory();
       final fileName =
           'celechron_schedule_${DateTime.now().millisecondsSinceEpoch}.ics';
-      final tempFile = File('${directory.path}/$fileName');
 
-      // 写入临时文件
-      await tempFile.writeAsString(icalContent);
-
-      // 使用系统分享功能
-      await SharePlus.instance.share(
-        ShareParams(
-          files: [XFile(tempFile.path)],
-          subject: '浙大课程表',
-          text: '从 Celechron 导出的课程表文件，可导入到其他日历应用中使用。',
-          sharePositionOrigin: sharePositionOrigin,
-        ),
+      final outputFile = await FilePicker.platform.saveFile(
+        dialogTitle: '保存课程表',
+        fileName: fileName,
+        type: FileType.custom,
+        allowedExtensions: ['ics'],
+        bytes: Uint8List.fromList(utf8.encode(icalContent)),
       );
 
-      _showAlert('成功', '课程表已导出，请选择保存位置或分享');
+      if (outputFile != null) {
+        _showAlert('成功', '课程表已保存至:\n$outputFile');
+      }
     } catch (e) {
       _showAlert('错误', '导出失败: $e', isError: true);
     }
@@ -290,7 +259,6 @@ class CalendarToIcal {
   }) async {
     try {
       // 在异步操作前计算分享位置，避免跨异步间隙使用 BuildContext
-      final sharePositionOrigin = await _calculateSharePositionOrigin(context);
 
       final icalContent = generateIcalFromScholar(
         scholar: scholar,
@@ -299,23 +267,20 @@ class CalendarToIcal {
         includeExams: true,
       );
 
-      final directory = await getApplicationDocumentsDirectory();
       final fileName =
           'celechron_${semesterName.replaceAll(' ', '_')}_${DateTime.now().millisecondsSinceEpoch}.ics';
-      final tempFile = File('${directory.path}/$fileName');
 
-      await tempFile.writeAsString(icalContent);
-
-      await SharePlus.instance.share(
-        ShareParams(
-          files: [XFile(tempFile.path)],
-          subject: '浙大课程表-$semesterName',
-          text: '从 Celechron 导出的 $semesterName 课程表文件。',
-          sharePositionOrigin: sharePositionOrigin,
-        ),
+      final outputFile = await FilePicker.platform.saveFile(
+        dialogTitle: '保存课程表-$semesterName',
+        fileName: fileName,
+        type: FileType.custom,
+        allowedExtensions: ['ics'],
+        bytes: Uint8List.fromList(utf8.encode(icalContent)),
       );
 
-      _showAlert('成功', '$semesterName 课程表已导出');
+      if (outputFile != null) {
+        _showAlert('成功', '$semesterName 课程表已保存至:\n$outputFile');
+      }
     } catch (e) {
       _showAlert('错误', '导出失败: $e', isError: true);
     }
@@ -328,7 +293,6 @@ class CalendarToIcal {
   }) async {
     try {
       // 在异步操作前计算分享位置，避免跨异步间隙使用 BuildContext
-      final sharePositionOrigin = await _calculateSharePositionOrigin(context);
 
       final icalContent = generateIcalFromScholar(
         scholar: scholar,
@@ -337,23 +301,20 @@ class CalendarToIcal {
         includeAllSemesters: true,
       );
 
-      final directory = await getApplicationDocumentsDirectory();
       final fileName =
           'celechron_all_semesters_${DateTime.now().millisecondsSinceEpoch}.ics';
-      final tempFile = File('${directory.path}/$fileName');
 
-      await tempFile.writeAsString(icalContent);
-
-      await SharePlus.instance.share(
-        ShareParams(
-          files: [XFile(tempFile.path)],
-          subject: '浙大课程表-完整版',
-          text: '从 Celechron 导出的完整课程表文件，包含所有学期。',
-          sharePositionOrigin: sharePositionOrigin,
-        ),
+      final outputFile = await FilePicker.platform.saveFile(
+        dialogTitle: '保存课程表-完整版',
+        fileName: fileName,
+        type: FileType.custom,
+        allowedExtensions: ['ics'],
+        bytes: Uint8List.fromList(utf8.encode(icalContent)),
       );
 
-      _showAlert('成功', '完整课程表已导出');
+      if (outputFile != null) {
+        _showAlert('成功', '完整课程表已保存至:\n$outputFile');
+      }
     } catch (e) {
       _showAlert('错误', '导出失败: $e', isError: true);
     }

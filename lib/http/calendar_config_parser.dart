@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:celechron/http/zjuServices/response_utils.dart';
 import 'package:celechron/model/semester.dart';
 import 'package:flutter/foundation.dart';
@@ -86,6 +84,7 @@ Uri calendarConfigUriForSemester(String semesterId) {
 
 Map<String, dynamic> decodeAndValidateCalendarConfig(
   String rawConfig, {
+  String? semesterId,
   required String context,
 }) {
   // startEnd 依次供两个半学期计算日期；sessionTime 的下标与节次直接对应。
@@ -93,10 +92,14 @@ Map<String, dynamic> decodeAndValidateCalendarConfig(
   var startEnd = asDynamicList(config['startEnd']);
   
   if (startEnd != null && startEnd.length == 4) {
-    if (context.contains('-1')) {
+    // 学年文件（如中财 2026-2027.json）含四个日期：
+    // 按学期精确截取，第一学期取前两段、第二学期取后两段，
+    // 复制成上下半学期相同的长学期结构。
+    final term = semesterId?.split('-').last;
+    if (term == '1') {
       startEnd = [startEnd[0], startEnd[1], startEnd[0], startEnd[1]];
       config['startEnd'] = startEnd;
-    } else if (context.contains('-2')) {
+    } else if (term == '2') {
       startEnd = [startEnd[2], startEnd[3], startEnd[2], startEnd[3]];
       config['startEnd'] = startEnd;
     }
@@ -112,78 +115,19 @@ Map<String, dynamic> decodeAndValidateCalendarConfig(
   return config;
 }
 
-String buildSafeDefaultCalendarConfig(
-  String semesterId, {
-  Map<String, dynamic>? template,
-}) {
-  // 这是保证课表仍可展示的推算配置，并非学校发布的官方校历。
-  // holiday、dummy、exchange 留空，避免凭空生成节假日或调休信息。
-  final parts = semesterId.split('-');
-  final year = int.parse(parts.first);
-  final term = int.parse(parts.last);
-  final firstStart = _mondayOnOrAfter(
-    term == 1 ? DateTime(year, 9, 14) : DateTime(year + 1, 2, 20),
-  );
-  final firstEnd = firstStart.add(const Duration(days: 55));
-  final secondStart = firstEnd.add(const Duration(days: 1));
-  final secondEnd = secondStart.add(const Duration(days: 55));
-
-  final templateTimes = asDynamicList(template?['sessionTime']);
-  final sessionTime = templateTimes != null && templateTimes.length >= 15
-      ? templateTimes
-      : _defaultSessionTime;
-  return jsonEncode({
-    'sessionTime': sessionTime,
-    'startEnd': [
-      _compactDate(firstStart),
-      _compactDate(firstEnd),
-      _compactDate(secondStart),
-      _compactDate(secondEnd),
-    ],
-    'holiday': <String, String>{},
-    'dummy': <String, String>{},
-    'exchange': <String, String>{},
-  });
-}
-
-DateTime _mondayOnOrAfter(DateTime date) {
-  final offset = (DateTime.monday - date.weekday) % 7;
-  return date.add(Duration(days: offset));
-}
-
-String _compactDate(DateTime date) {
-  return '${date.year.toString().padLeft(4, '0')}'
-      '${date.month.toString().padLeft(2, '0')}'
-      '${date.day.toString().padLeft(2, '0')}';
-}
-
-const _defaultSessionTime = [
-  ['00:00', '00:00'],
-  ['08:00', '08:45'],
-  ['08:50', '09:35'],
-  ['10:00', '10:45'],
-  ['10:50', '11:35'],
-  ['11:40', '12:25'],
-  ['13:25', '14:10'],
-  ['14:15', '15:00'],
-  ['15:05', '15:50'],
-  ['16:15', '17:00'],
-  ['17:05', '17:50'],
-  ['18:50', '19:35'],
-  ['19:40', '20:25'],
-  ['20:30', '21:15'],
-  ['21:20', '22:05'],
-  ['22:10', '22:55'],
-];
-
 void applyCalendarConfig(
   String rawConfig,
   Semester semester,
   Map<DateTime, String> specialDates, {
+  String? semesterId,
   required String context,
 }) {
   // holiday/dummy 的键是日期；exchange 的键拼接放假日和调休日各 8 位日期。
-  final config = decodeAndValidateCalendarConfig(rawConfig, context: context);
+  final config = decodeAndValidateCalendarConfig(
+    rawConfig,
+    semesterId: semesterId,
+    context: context,
+  );
   semester.addZjuCalendar(config);
 
   void addDates(Object? raw, String suffix) {

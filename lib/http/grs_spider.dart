@@ -349,6 +349,7 @@ class GrsSpider implements Spider {
             value.item2!,
             outSemesters[semesterIndexMap['$queryAcademicYear-1']!],
             outSpecialDates,
+            semesterId: '$queryAcademicYear-1',
             context: '校历（学年学期 $queryAcademicYear-1）',
           );
         }
@@ -381,6 +382,7 @@ class GrsSpider implements Spider {
             value.item2!,
             outSemesters[semesterIndexMap['$queryAcademicYear-2']!],
             outSpecialDates,
+            semesterId: '$queryAcademicYear-2',
             context: '校历（学年学期 $queryAcademicYear-2）',
           );
         }

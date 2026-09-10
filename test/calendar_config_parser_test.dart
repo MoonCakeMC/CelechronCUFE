@@ -12,12 +12,44 @@ void main() {
     expect(academicYearStartFor(DateTime(2026, 9, 1)), 2026);
   });
 
-  test('calendar key matches academic term', () {
-    expect(calendarObjectKeyForSemester('2025-2026-2'), '2025-2026-2.json');
+  test('calendar key maps to academic year file', () {
+    expect(calendarObjectKeyForSemester('2026-1'), '2026-2027.json');
+    expect(calendarObjectKeyForSemester('2026-2'), '2026-2027.json');
     expect(
-      calendarConfigUriForSemester('2025-2026-2').toString(),
-      'http://calendar.celechron.top/2025-2026-2.json',
+      calendarConfigUriForSemester('2026-1').toString(),
+      'https://oss-2.147483648.xyz/celechroncufe/2026-2027.json',
     );
+  });
+
+  test('decodeAndValidateCalendarConfig splits startEnd by semesterId', () {
+    const raw = '{"sessionTime":['
+        '["08:00","08:45"],["08:55","09:40"],["10:00","10:45"],'
+        '["10:55","11:40"],["11:50","12:35"],["12:45","13:30"],'
+        '["14:00","14:45"],["14:55","15:40"],["16:00","16:45"],'
+        '["16:55","17:40"],["17:50","18:35"],["19:20","20:05"],'
+        '["20:15","21:00"]'
+        '],"startEnd":["20260907","20270124","20270222","20270711"],'
+        '"holiday":{},"dummy":{},"exchange":{}}';
+
+    final autumn = decodeAndValidateCalendarConfig(
+      raw,
+      semesterId: '2026-1',
+      context: '虚构第一学期',
+    );
+    expect(autumn['startEnd'],
+        ['20260907', '20270124', '20260907', '20270124']);
+
+    final spring = decodeAndValidateCalendarConfig(
+      raw,
+      semesterId: '2026-2',
+      context: '虚构第二学期',
+    );
+    expect(spring['startEnd'],
+        ['20270222', '20270711', '20270222', '20270711']);
+
+    final noTerm = decodeAndValidateCalendarConfig(raw, context: '虚构');
+    expect(noTerm['startEnd'],
+        ['20260907', '20270124', '20270222', '20270711']);
   });
 
   test('timetable plan probes the next academic year before September', () {
@@ -55,15 +87,9 @@ void main() {
     expect(isExpectedTimetableProbeMiss('登录态已失效'), isFalse);
   });
 
-  test('future timetable session survives missing calendar fallback', () {
-    final semester = Semester('2026-2027秋冬');
-    final fallback = buildSafeDefaultCalendarConfig('2026-2027-1');
-    applyCalendarConfig(
-      fallback,
-      semester,
-      <DateTime, String>{},
-      context: '虚构未来学期',
-    );
+  test('future timetable session survives without calendar config', () {
+    // 无校历配置时学期仍可持有课程安排（课表网格可用），仅日程生成被禁用
+    final semester = Semester('2026-2027秋');
     final session = Session.fromZdbk({
       'kcb': '虚构课程<br>虚构教学班<br>虚构教师<br>虚构教室zwf',
       'sfqd': '1',
@@ -74,12 +100,14 @@ void main() {
       'skcd': 2,
     });
 
-    semester.addSession(session, '2026-2027-1');
+    semester.addSession(session, '2026-1');
 
     expect(semester.sessions, hasLength(1));
     expect(semester.sessions.single.teacher, '虚构教师');
     expect(semester.sessions.single.location, '虚构教室');
     expect(semester.sessions.single.time, [3, 4]);
+    // 无校历：不生成任何日程
+    expect(semester.periods, isEmpty);
   });
 
   test('diagnostic text removes credentials and URL query values', () {

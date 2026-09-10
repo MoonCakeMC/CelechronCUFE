@@ -9,10 +9,9 @@ import 'package:celechron/services/diagnostic_log_service.dart';
 import 'package:celechron/utils/tuple.dart';
 import 'package:flutter/foundation.dart';
 
-/// 获取并校验学期校历；远程不可用时按“同学期缓存、推算配置”顺序降级。
+/// 获取并校验学期校历；远程不可用时按“同学期缓存”降级，
+/// 无任何缓存时报错并禁用（不使用推算的默认配置）。
 class TimeConfigService {
-  static const _lastValidCacheKey = 'timeConfig_lastValid';
-
   DatabaseHelper? _db;
 
   set db(DatabaseHelper? db) {
@@ -86,13 +85,13 @@ class TimeConfigService {
       );
       decodeAndValidateCalendarConfig(
         body,
+        semesterId: semesterId,
         context: '$context；HTTP ${response.statusCode}',
       );
       await Future.wait([
-        // 精确学期缓存用于恢复本学期；最后有效配置只提供节次时间模板。
+        // 精确学期缓存用于恢复本学期。
         _db?.setCachedWebPage('timeConfig_$semesterId', body) ??
             Future<void>.value(),
-        _db?.setCachedWebPage(_lastValidCacheKey, body) ?? Future<void>.value(),
         _db?.setCachedWebPage(
               'timeConfig_timestamp_$semesterId',
               DateTime.now().toUtc().toIso8601String(),
@@ -141,6 +140,7 @@ class TimeConfigService {
       try {
         decodeAndValidateCalendarConfig(
           exactCache,
+          semesterId: semesterId,
           context: '$context 本地缓存',
         );
         return _CalendarFallback(
@@ -160,38 +160,13 @@ class TimeConfigService {
       }
     }
 
-    // 其它学期缓存不能复用日期，只提取经过校验的 sessionTime。
-    Map<String, dynamic>? template;
-    final lastValid = _db?.getCachedWebPage(_lastValidCacheKey);
-    if (lastValid != null) {
-      try {
-        template = decodeAndValidateCalendarConfig(
-          lastValid,
-          context: '$context 上一份有效缓存',
-        );
-      } on Object catch (error, stackTrace) {
-        DiagnosticLogService.instance.record(
-          level: CelechronLogLevel.warning,
-          module: '校历',
-          operation: 'readTemplateCache',
-          cacheUsed: false,
-          error: error,
-          stackTrace: stackTrace,
-        );
-      }
-    }
-    return _CalendarFallback(
-      buildSafeDefaultCalendarConfig(
-        semesterId,
-        template: template,
-      ),
-      DataSourceStatus.fallback,
-    );
+    // 无任何缓存：不使用推算的默认配置，直接报错禁用。
+    return const _CalendarFallback(null, DataSourceStatus.unavailable);
   }
 }
 
 class _CalendarFallback {
-  final String config;
+  final String? config;
   final DataSourceStatus status;
   final String? cachedAt;
 

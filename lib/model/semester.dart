@@ -238,11 +238,15 @@ class Semester {
 
   List<Period>? _periodsCache;
 
+  // 校历是否可用；无校历的学期禁用日程生成（日历排期返回空）
+  bool _calendarAvailable = false;
+
   void _invalidatePeriodsCache() => _periodsCache = null;
 
   // 构建代价高，缓存结果；任何影响构建输入的 mutator 都必须调用 _invalidatePeriodsCache。
   // 调用方不得原地修改返回的列表（需要排序等操作时先拷贝）。
-  List<Period> get periods => _periodsCache ??= _buildPeriods();
+  List<Period> get periods =>
+      _calendarAvailable ? (_periodsCache ??= _buildPeriods()) : const [];
 
   List<Period> _buildPeriods() {
     List<Period> periods = [];
@@ -583,17 +587,28 @@ class Semester {
     }
 
     final holidays = <DateTime, String>{};
+    // 假日与调休只保留属于本学期的日期：学年文件（如中财）包含两个学期
+    // 的假日，长学期结构下 [startEnd[0], startEnd[1]] 与
+    // [startEnd[2], startEnd[3]] 即本学期的两个半区间。
+    bool inSemester(DateTime date) =>
+        (!date.isBefore(startEnd[0]) && !date.isAfter(startEnd[1])) ||
+        (!date.isBefore(startEnd[2]) && !date.isAfter(startEnd[3]));
     for (final entry in (asStringMap(json['holiday']) ?? const {}).entries) {
       final date = asDateTime(entry.key);
       final name = asString(entry.value);
-      if (date != null && name != null) holidays[date] = name;
+      if (date != null && name != null && inSemester(date)) {
+        holidays[date] = name;
+      }
     }
     final exchanges = <DateTime, DateTime>{};
-    for (final key in (asStringMap(json['exchange']) ?? const {}).keys) {
+    for (final entry in (asStringMap(json['exchange']) ?? const {}).entries) {
+      final key = entry.key;
       if (key.length < 16) continue;
       final first = asDateTime(key.substring(0, 8));
       final second = asDateTime(key.substring(8, 16));
-      if (first != null && second != null) {
+      if (first != null &&
+          second != null &&
+          (inSemester(first) || inSemester(second))) {
         exchanges[first] = second;
         exchanges[second] = first;
       }
@@ -602,6 +617,7 @@ class Semester {
     _sessionToTime = sessionToTime;
     _holidays = holidays;
     _exchanges = exchanges;
+    _calendarAvailable = true;
     _dayOfWeekToDays = [
       [
         /*上半学期*/
@@ -793,6 +809,9 @@ class Semester {
       calendar.add(half);
     }
     if (calendar.length == 2) semester._dayOfWeekToDays = calendar;
+    // 旧数据未持久化校历可用标记：按恢复的日期数组非空推断
+    semester._calendarAvailable = semester._dayOfWeekToDays
+        .any((half) => half.any((oddEven) => oddEven.any((days) => days.isNotEmpty)));
 
     semester._holidays = {};
     for (final entry in (asStringMap(json['holidays']) ?? const {}).entries) {
