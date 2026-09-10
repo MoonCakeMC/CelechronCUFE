@@ -52,15 +52,15 @@ class Exam {
         final dateTimeText = asString(json['qzkssj']) ?? '';
         time = TimeHelper.parseExamDateTime(dateTimeText);
         dateLabel = TimeHelper.parseExamDateLabel(dateTimeText);
-        location = asString(json['qzjsmc']);
-        seat = asString(json['qzzwxh']);
+        location = asString(json['qzjsmc']) ?? asString(json['cdmc']);
+        seat = asString(json['zwh']) ?? asString(json['row_id']);
         break;
       case ExamType.finalExam:
         final dateTimeText = asString(json['kssj']) ?? '';
         time = TimeHelper.parseExamDateTime(dateTimeText);
         dateLabel = TimeHelper.parseExamDateLabel(dateTimeText);
-        location = asString(json['jsmc']);
-        seat = asString(json['zwxh']);
+        location = asString(json['jsmc']) ?? asString(json['cdmc']);
+        seat = asString(json['zwh']) ?? asString(json['row_id']);
         break;
     }
   }

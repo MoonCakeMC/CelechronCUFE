@@ -30,7 +30,10 @@ class CourseDetailPage extends StatelessWidget {
           break;
         }
         for (var c in sem.courses.values) {
-          if (c.id == courseId || c.realId == courseId) {
+          // 课程 map 的 key 为课程号(kch)，同时兼容旧 id/课号形式的 courseId
+          if (c.id == courseId ||
+              c.realId == courseId ||
+              c.kch == courseId) {
             found = c;
             break;
           }

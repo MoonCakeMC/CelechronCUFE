@@ -125,11 +125,20 @@ class Semester {
 
   void mergePartialFrom(Semester incoming) {
     // 用于部分刷新失败时补充新数据；空或不完整对象不得替换已有课程安排。
+    // 匹配优先级：课程号(kch) → id → 名称。
     Course? matchingCourse(Course incomingCourse) {
+      final incomingKch = incomingCourse.kch;
+      if (incomingKch != null && incomingKch.isNotEmpty) {
+        for (final existing in _courses.values) {
+          if (existing.kch == incomingKch) return existing;
+        }
+      }
       for (final existing in _courses.values) {
         if (incomingCourse.id != null && existing.id == incomingCourse.id) {
           return existing;
         }
+      }
+      for (final existing in _courses.values) {
         if (existing.name == incomingCourse.name) return existing;
       }
       return null;
@@ -437,12 +446,31 @@ class Semester {
     // completeSession 即使判定重复也会改写已存 Session 的 firstHalf/secondHalf/id，必须失效缓存
     _invalidatePeriodsCache();
     // 由于ZDBK不给课号，Session的id初始值为null，不能直接拿来用！
-    // 因此本科课程以“学期 + 课程名”归组，再由 Course 合并重复安排。
-    var key = '$semesterId${session.name}';
+    // 因此本科课程以“学期 + 课程号(kch)”归组，kch 缺失时以课程名兜底，
+    // 再由 Course 合并重复安排。
+    var key = '$semesterId${session.kch ?? session.name}';
     if (_courses.containsKey(key)) {
       // 坑爹的API，有时同一节课会出现两次，必须鉴别是否重复。
       if (_courses[key]!.completeSession(session)) {
         _sessions.add(session);
+      }
+    } else if (session.kch == null) {
+      // kch 缺失（实践课等）时尝试关联唯一同名课程，避免同名课程被拆成两条
+      final sameName = _courses.values
+          .where((course) => course.name == session.name)
+          .toList();
+      if (sameName.length == 1) {
+        if (sameName.first.completeSession(session)) {
+          _sessions.add(session);
+        }
+        return;
+      }
+      _sessions.add(session);
+      if (isGrs) {
+        _courses.addEntries([MapEntry(key, Course.fromGrsSession(session))]);
+      } else {
+        _courses.addEntries(
+            [MapEntry(key, Course.fromUgrsSessionWithoutID(session))]);
       }
     } else {
       _sessions.add(session);
@@ -463,9 +491,20 @@ class Semester {
     _invalidatePeriodsCache();
     // 有的课没有考试，但是能查到考试信息，其考试时间为null。
     _exams.addAll(examDto.exams);
-    var key = '$semesterId${examDto.name}';
+    // 课程号(kch)优先归组，kch 缺失时按名称（可能关联到课表同名 Course）
+    var key = '$semesterId${examDto.kch ?? examDto.name}';
     if (_courses.containsKey(key)) {
       _courses[key]!.completeExam(examDto);
+    } else if (examDto.kch == null) {
+      // kch 缺失时尝试关联唯一同名课程，避免同名课程被拆成两条
+      final sameName = _courses.values
+          .where((course) => course.name == examDto.name)
+          .toList();
+      if (sameName.length == 1) {
+        sameName.first.completeExam(examDto);
+        return;
+      }
+      _courses.addEntries([MapEntry(key, Course.fromExam(examDto))]);
     } else {
       _courses.addEntries([MapEntry(key, Course.fromExam(examDto))]);
     }
@@ -480,9 +519,24 @@ class Semester {
     // completeGrade 可能把已存 Session 的 location 改写为“线上”，必须失效缓存
     _invalidatePeriodsCache();
     _grades.add(grade);
-    var key = '$semesterId${grade.name}';
+    // 课程号(kch)优先归组，kch 缺失时按名称（可能关联到课表同名 Course）
+    var key = '$semesterId${grade.kch ?? grade.name}';
     if (_courses.containsKey(key)) {
       _courses[key]!.completeGrade(grade);
+    } else if (grade.kch == null) {
+      // kch 缺失时尝试关联唯一同名课程，避免同名课程被拆成两条
+      final sameName = _courses.values
+          .where((course) => course.name == grade.name)
+          .toList();
+      if (sameName.length == 1) {
+        sameName.first.completeGrade(grade);
+        return;
+      }
+      if (isGrs) {
+        _courses.addEntries([MapEntry(key, Course.fromGrsGrade(grade))]);
+      } else {
+        _courses.addEntries([MapEntry(key, Course.fromUgrsGrade(grade))]);
+      }
     } else {
       if (isGrs) {
         _courses.addEntries([MapEntry(key, Course.fromGrsGrade(grade))]);

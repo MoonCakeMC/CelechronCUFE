@@ -1,7 +1,9 @@
 import 'package:celechron/utils/json_utils.dart';
 
 class Grade {
-  String id; // 课程号
+  String id; // 课程号（kch_id，缺失时用 kch 兜底）
+  String? kch; // 教务课程号（如 "0830024"），跨接口统一的课程合并键
+  String? semester; // 由 xnm/xqm 解析出的学期，如 "2020-1"；无法解析时为 null
   String name; // 课程名
   double credit; // 学分
   String original; // 原始成绩
@@ -23,7 +25,12 @@ class Grade {
           : 0.0;
 
   // only used for ugrs
-  String get semesterId => id.length > 12 ? id.substring(1, 12) : "研究生请勿使用此函数";
+  String get semesterId {
+    // 优先使用 xnm/xqm 解析出的学期；无该信息时回退旧逻辑（研究生等）
+    final parsed = semester;
+    if (parsed != null && parsed.isNotEmpty) return parsed;
+    return id.length > 12 ? id.substring(1, 12) : "研究生请勿使用此函数";
+  }
 
   String get realId {
     var matchClass = RegExp(r'(\(.*\)-.*?)-.*').firstMatch(id);
@@ -74,20 +81,36 @@ class Grade {
 
   // 从所有成绩查询处爬取，因此不含主修标记
   factory Grade(Map<String, dynamic> json) {
-    final id = asString(json['xkkh']) ?? asString(json['kch_id']);
+    final kch = asString(json['kch']);
+    final id = asString(json['kch_id']) ?? kch;
     if (id == null || id.isEmpty) {
-      throw const FormatException('成绩缺少选课课号(xkkh)或课程号(kch_id)');
+      throw const FormatException('成绩缺少课程号(kch_id/kch)');
     }
     final grade = Grade.empty()
       ..id = id
+      ..kch = kch
       ..name = (asString(json['kcmc']) ?? '未知课程')
           .replaceAll('(', '（')
           .replaceAll(')', '）')
       ..credit = asDouble(json['xf']) ?? 0.0
       ..original = asString(json['cj']) ?? ''
-      ..fivePoint = asDouble(json['jd']) ?? 0.0;
+      ..fivePoint = asDouble(json['jd']) ?? 0.0
+      ..semester = _parseSemester(asString(json['xnm']), asString(json['xqm']));
     grade._completeDerivedFields();
     return grade;
+  }
+
+  /// 将教务返回的 xnm（学年）与 xqm（学期：3=第一学期，12=第二学期）
+  /// 解析为学期标识，如 "2020-1"；无法解析时返回 null。
+  static String? _parseSemester(String? xnm, String? xqm) {
+    if (xnm == null || xnm.isEmpty) return null;
+    final term = switch (xqm) {
+      '3' => '1',
+      '12' => '2',
+      _ => null,
+    };
+    if (term == null) return null;
+    return '$xnm-$term';
   }
 
   void _completeDerivedFields() {
@@ -114,6 +137,8 @@ class Grade {
 
   Map<String, dynamic> toJson() => {
         'id': id,
+        'kch': kch,
+        'semester': semester,
         'name': name,
         'credit': credit,
         'original': original,
@@ -127,6 +152,8 @@ class Grade {
 
   Grade.fromJson(Map<String, dynamic> json)
       : id = asString(json['id']) ?? '',
+        kch = asString(json['kch']),
+        semester = asString(json['semester']),
         name = asString(json['name']) ?? '未知课程',
         credit = asDouble(json['credit']) ?? 0.0,
         original = asString(json['original']) ?? '',

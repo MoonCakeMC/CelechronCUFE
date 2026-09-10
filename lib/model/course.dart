@@ -7,6 +7,8 @@ import 'session.dart';
 
 class Course {
   String? id;
+  // 教务课程号（如 "0830024"），跨接口统一的课程合并键；无 kch 的旧数据为 null
+  String? kch;
   late String name;
   late bool confirmed;
   double credit = 0.0;
@@ -21,11 +23,12 @@ class Course {
   String? type; // GRS-specific course type (e.g., "专业学位课")
 
   String get realId {
-    if (id == null) return '未知';
+    // 优先展示课程号 kch；课表来源有标准 jxbmc 时展示带学年的课号形式
+    if (id == null) return kch ?? '未知';
     var matchClass = RegExp(r'(\(.*\)-.*?)-.*').firstMatch(id!);
     var key = matchClass?.group(1);
-    key ??= id!.length < 22 ? id : id!.substring(0, 22);
-    return key ?? '未知';
+    if (key == null) return kch ?? (id!.length < 22 ? id! : id!.substring(0, 22));
+    return key;
   }
 
   /// 课程的全部教师（从各安排收集并去重，保证分周授课的多教师都能展示）
@@ -51,6 +54,7 @@ class Course {
 
   Course.fromExam(ExamDto examDto) {
     id = examDto.id;
+    kch = examDto.kch;
     name = examDto.name;
     credit = examDto.credit;
     confirmed = true;
@@ -77,6 +81,7 @@ class Course {
   // used for zdbk
   Course.fromUgrsSessionWithoutID(Session session) {
     id = session.id;
+    kch = session.kch;
     name = session.name;
     confirmed = session.confirmed;
     teacher = session.teacher;
@@ -88,6 +93,7 @@ class Course {
 
   Course.fromUgrsGrade(Grade this.grade)
       : id = grade.id,
+        kch = grade.kch,
         name = grade.name,
         confirmed = true,
         credit = grade.credit;
@@ -96,6 +102,7 @@ class Course {
   // grs的获取课表接口和获取成绩接口拿到的id不同，一切id以课表接口为准
   Course.fromGrsGrade(Grade this.grade)
       : id = grade.id,
+        kch = grade.kch,
         name = grade.name,
         confirmed = true,
         online = grade.isOnline,
@@ -122,6 +129,7 @@ class Course {
     exams.addAll(examDto.exams);
     // 如果调用了这个函数，则表明该Course对象可能是基于Session创建的。因此，id可能为null，必须补全。
     id ??= examDto.id;
+    kch ??= examDto.kch;
     for (var e in sessions) {
       e.id = id;
     }
@@ -132,6 +140,7 @@ class Course {
     // 然而，通过成绩创建的Course可能没有id，因此我们这里判断下id是否为空，为空则使用sessioin中带的id
     // 后续只合并同一安排或相邻节次，避免重复接口记录生成重叠课程。
     id ??= session.id;
+    kch ??= session.kch;
     session.id = id;
     teacher ??= session.teacher;
     // Transfer metadata from Session if available
@@ -201,6 +210,7 @@ class Course {
   void completeGrade(Grade grade) {
     credit = grade.credit;
     this.grade = grade;
+    kch ??= grade.kch;
     // used for grs online course
     if (grade.isOnline == true && sessions.every((e) => e.location == null)) {
       for (var e in sessions) {
@@ -213,6 +223,7 @@ class Course {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'kch': kch,
       'name': name,
       'confirmed': confirmed,
       'credit': credit,
@@ -228,6 +239,7 @@ class Course {
   factory Course.fromJson(Map<String, dynamic> json) {
     final course = Course._empty()
       ..id = asString(json['id'])
+      ..kch = asString(json['kch'])
       ..name = asString(json['name']) ?? '未知课程'
       ..confirmed = asBool(json['confirmed']) ?? true
       ..credit = asDouble(json['credit']) ?? 0.0

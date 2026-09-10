@@ -32,6 +32,9 @@ class Session {
   bool? online;
   String? type;
 
+  // 教务课程号（如 "0830024"），跨接口（课表/成绩/考试）统一的课程合并键
+  String? kch;
+
   // 是否显示在课表网格中。教务网“其他课程”（实践课等）没有具体时间地点，
   // 仅进入课程列表，不占用课表网格。
   bool showOnTimetable = true;
@@ -74,6 +77,7 @@ class Session {
     // HTML 换行块中；xxq 表示半学期，djj/skcd 分别提供起始节次和连续节数。
     final session = Session.empty()
       ..id = asString(json['jxbmc']) ?? asString(json['jxb_id']) ?? asString(json['kch_id']) ?? asString(json['kch']) ?? asString(json['id'])
+      ..kch = asString(json['kch'])
       ..credit = asDouble(json['xf'])
       ..confirmed = asString(json['sfqd']) != '0'
       ..dayOfWeek = asInt(json['xqj']) ?? 1
@@ -94,11 +98,17 @@ class Session {
       }
     }
     
-    // 如果 kcb 解析失败（中财可能不返回 kcb HTML块），回退到原始字段
+    // 如果 kcb 解析失败（中财可能不返回 kcb HTML块），回退到原始字段。
+    // 教务数据中 kcmc 可能带前导/尾随空格（如 " 国家安全教育"），统一 trim。
     if (session.name == '未知课程') {
-      session.name = (asString(json['kcmc']) ?? '未知课程').replaceAll('(', '（').replaceAll(')', '）');
-      session.teacher = asString(json['xm']) ?? asString(json['jsxm']) ?? '未知教师';
-      session.location = asString(json['cdmc']);
+      session.name = (asString(json['kcmc']) ?? '未知课程')
+          .replaceAll('(', '（')
+          .replaceAll(')', '）')
+          .trim();
+      session.teacher =
+          (asString(json['xm']) ?? asString(json['jsxm']) ?? '未知教师')
+              .trim();
+      session.location = asString(json['cdmc'])?.trim();
     }
     // 短学期 or 长学期
     final semester = asString(json['xxq']);
@@ -240,6 +250,7 @@ class Session {
 
   Map<String, dynamic> toJson() => {
         'id': id,
+        'kch': kch,
         'name': name,
         'teacher': teacher,
         'teacherId': teacherId,
@@ -284,6 +295,7 @@ class Session {
         credit = asDouble(json['credit']),
         online = asBool(json['online']),
         type = asString(json['type']),
+        kch = asString(json['kch']),
         showOnTimetable = asBool(json['showOnTimetable']) ?? true;
 
   String get chineseTime {

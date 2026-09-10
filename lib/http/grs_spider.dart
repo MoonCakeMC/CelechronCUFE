@@ -698,8 +698,13 @@ class GrsSpider implements Spider {
 
     for (var semester in outSemesters) {
       var toRemove = semester.courses.keys.toList();
+      // 统一以课程号(kch)作为课程 map 的 key；研究生无 kch 时回退 id/名称
       var toAdd = semester.courses.values
-          .map((e) => MapEntry(e.id ?? e.name + e.toString(), e))
+          .map((e) => MapEntry(
+              (e.kch != null && e.kch!.isNotEmpty)
+                  ? e.kch!
+                  : (e.id ?? e.name + e.toString()),
+              e))
           .toList();
       semester.courses.addEntries(toAdd);
       for (var key in toRemove) {

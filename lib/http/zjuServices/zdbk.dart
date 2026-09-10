@@ -434,8 +434,10 @@ class Zdbk {
     return await _withAutoRelogin(httpClient, (relogged, retried) async {
       late HttpClientRequest request;
       late HttpClientResponse response;
+      // 个人成绩接口（接口地址以 get_info.py 为参考改为个人版）；
+      // 不带 xnm/xqm 抓取全部学期，由返回条目自带的 xnm/xqm 分配学期。
       final uri = Uri.parse(
-          "https://xuanke.cufe.edu.cn/jwglxt/cjcx/cjcx_cxDgXscj.html?doType=query&gnmkdm=N305005&queryModel.showCount=5000");
+          "https://xuanke.cufe.edu.cn/jwglxt/cjcx/cjcx_cxXsgrcj.html?doType=query&gnmkdm=N305005&queryModel.showCount=5000");
 
       try {
         request = await httpClient.postUrl(uri).timeout(
@@ -452,6 +454,15 @@ class Zdbk {
         request.cookies.add(_jSessionId!);
         request.cookies.add(_route!);
         request.followRedirects = false;
+        request.headers.contentType = ContentType(
+            'application', 'x-www-form-urlencoded',
+            charset: 'utf-8');
+        // 与 get_info.py 的 get_grade 参数保持一致；xnm/xqm 留空表示全部学期
+        final bodyBytes = utf8.encode(
+            '_search=false&nd=${DateTime.now().millisecondsSinceEpoch}'
+            '&queryModel.currentPage=1&queryModel.sortName=&queryModel.sortOrder=asc&time=0');
+        request.headers.contentLength = bodyBytes.length;
+        request.add(bodyBytes);
         response = await request.close().timeout(const Duration(seconds: 8),
             onTimeout: () => throw requestTimeout());
 
