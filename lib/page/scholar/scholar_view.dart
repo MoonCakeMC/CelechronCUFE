@@ -486,7 +486,12 @@ class ScholarPage extends StatelessWidget {
                                             ),
                                           ),
                                       title:
-                                          '${_scholarController.selectedSemester.firstHalfName}学期课时',
+                                          _scholarController
+                                                      .selectedSemester
+                                                      .secondHalfName ==
+                                                  ''
+                                              ? '秋学期课时'
+                                              : '${_scholarController.selectedSemester.firstHalfName}学期课时',
                                       content:
                                           '${_scholarController.selectedSemester.firstHalfSessionCount}节/两周',
                                       backgroundColor: _scholarController
@@ -514,7 +519,12 @@ class ScholarPage extends StatelessWidget {
                                             ),
                                           ),
                                       title:
-                                          '${_scholarController.selectedSemester.secondHalfName}学期课时',
+                                          _scholarController
+                                                      .selectedSemester
+                                                      .secondHalfName ==
+                                                  ''
+                                              ? '春学期课时'
+                                              : '${_scholarController.selectedSemester.secondHalfName}学期课时',
                                       content:
                                           '${_scholarController.selectedSemester.secondHalfSessionCount}节/两周',
                                       backgroundColor: _scholarController

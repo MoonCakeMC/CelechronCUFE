@@ -21,6 +21,12 @@ subprojects {
 }
 subprojects {
     project.evaluationDependsOn(':app')
+    project.ext.flutter = [
+        compileSdkVersion: 35,
+        targetSdkVersion: 35,
+        minSdkVersion: 21,
+        ndkVersion: "27.0.12077973"
+    ]
 }
 
 tasks.register("clean", Delete) {

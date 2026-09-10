@@ -305,13 +305,16 @@ class GrsSpider implements Spider {
     // 岩壁加起来7年+本科2年
     var yearGraduate = yearEnroll + 9;
     Map<String, int> semesterIndexMap = <String, int>{};
+    // 名称使用完整学年（如 2026-2027秋），且每个学年秋学期在前、春学期在后
     for (var i = 9, j = 0; i >= 0; i--, j++) {
       semesterIndexMap.addEntries(
-          [MapEntry('${yearEnroll + i}-2', j * 2)]);
+          [MapEntry('${yearEnroll + i}-1', j * 2)]);
       semesterIndexMap.addEntries(
-          [MapEntry('${yearEnroll + i}-1', j * 2 + 1)]);
-      outSemesters.add(Semester('${yearEnroll + i}春'));
-      outSemesters.add(Semester('${yearEnroll + i}秋'));
+          [MapEntry('${yearEnroll + i}-2', j * 2 + 1)]);
+      outSemesters
+          .add(Semester('${yearEnroll + i}-${yearEnroll + i + 1}秋'));
+      outSemesters
+          .add(Semester('${yearEnroll + i}-${yearEnroll + i + 1}春'));
     }
 
     // 查校历（存在CDN上，JSON格式的，内含学期起止日期、单日时间表、放假调休等信息）

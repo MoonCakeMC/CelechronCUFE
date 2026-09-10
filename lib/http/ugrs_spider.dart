@@ -351,13 +351,16 @@ class UgrsSpider implements Spider {
     );
     Map<String, int> semesterIndexMap = <String, int>{};
     // 大一开学考的学期是入学的前一学期
+    // 名称使用完整学年（如 2026-2027秋），且每个学年秋学期在前、春学期在后
     for (var i = 7, j = 0; i >= -1; i--, j++) {
       semesterIndexMap.addEntries(
-          [MapEntry('${yearEnroll + i}-2', j * 2)]);
+          [MapEntry('${yearEnroll + i}-1', j * 2)]);
       semesterIndexMap.addEntries(
-          [MapEntry('${yearEnroll + i}-1', j * 2 + 1)]);
-      outSemesters.add(Semester('${yearEnroll + i}春'));
-      outSemesters.add(Semester('${yearEnroll + i}秋'));
+          [MapEntry('${yearEnroll + i}-2', j * 2 + 1)]);
+      outSemesters
+          .add(Semester('${yearEnroll + i}-${yearEnroll + i + 1}秋'));
+      outSemesters
+          .add(Semester('${yearEnroll + i}-${yearEnroll + i + 1}春'));
     }
 
     var semesterConfigFetches = <Future<String?>>[];

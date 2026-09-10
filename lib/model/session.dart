@@ -43,6 +43,25 @@ class Session {
 
   static const String dayMap = '零一二三四五六日';
 
+  /// 按请求的学期参数设置上半/下半学期归属：
+  /// 中财长学期分秋（xqm=1）与春（xqm=2）两个独立学期，
+  /// 秋学期课程记为 firstHalf，春学期课程记为 secondHalf。
+  /// 其余参数值不做修改（研究生链路由 grs_new 自行设置）。
+  static void applySemesterHalf(Session session, String? semester) {
+    switch (semester) {
+      case '1':
+        session.firstHalf = true;
+        session.secondHalf = false;
+        break;
+      case '2':
+        session.firstHalf = false;
+        session.secondHalf = true;
+        break;
+      default:
+        break;
+    }
+  }
+
   Session.empty()
       : confirmed = true,
         oddWeek = false,

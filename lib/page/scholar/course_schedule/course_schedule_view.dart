@@ -88,8 +88,11 @@ class CourseSchedulePage extends StatelessWidget {
                           _courseScheduleController
                               .firstOrSecondSemester.value = true;
                         },
-                        title:
-                            '${_courseScheduleController.semester.firstHalfName}学期课时',
+                        title: _courseScheduleController
+                                    .semester.secondHalfName ==
+                                ''
+                            ? '秋学期课时'
+                            : '${_courseScheduleController.semester.firstHalfName}学期课时',
                         content:
                             '${_courseScheduleController.semester.firstHalfSessionCount}节/两周',
                         backgroundColor: _courseScheduleController
@@ -108,8 +111,11 @@ class CourseSchedulePage extends StatelessWidget {
                           _courseScheduleController
                               .firstOrSecondSemester.value = false;
                         },
-                        title:
-                            '${_courseScheduleController.semester.secondHalfName}学期课时',
+                        title: _courseScheduleController
+                                    .semester.secondHalfName ==
+                                ''
+                            ? '春学期课时'
+                            : '${_courseScheduleController.semester.secondHalfName}学期课时',
                         content:
                             '${_courseScheduleController.semester.secondHalfSessionCount}节/两周',
                         backgroundColor: _courseScheduleController

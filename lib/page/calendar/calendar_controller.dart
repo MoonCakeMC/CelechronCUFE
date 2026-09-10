@@ -105,6 +105,10 @@ class CalendarController extends GetxController {
   }
 
   bool isFirstHalfSemester(Semester semester) {
+    // 中财长学期（无第二半学期）：秋学期显示第一视图，春学期显示第二视图
+    if (semester.secondHalfName == '') {
+      return semester.firstHalfName == '秋';
+    }
     final now = DateTime.now();
     final toFirstWeek = now.difference(semester.firstDay).inDays ~/ 7;
     return toFirstWeek < 8;

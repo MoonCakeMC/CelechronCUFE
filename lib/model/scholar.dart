@@ -95,19 +95,19 @@ class Scholar {
   }
 
   Semester get thisSemester {
-    if (semesters.length > 1) {
-      if (semesters[1]
-          .periods
-          .last
-          .endTime
-          .isAfter(DateTime.now().subtract(const Duration(days: 14)))) {
-        return semesters[1];
-      } else {
-        return semesters[0];
+    return semesterForDate(semesters, DateTime.now());
+  }
+
+  /// 从按时间降序排列的学期列表中选出日期所在的学期：
+  /// 返回第一个“包含该日期”（firstDay ≤ day ≤ lastDay）的学期；
+  /// 若都不包含（如假期），返回最新学期（列表第一个）。
+  static Semester semesterForDate(List<Semester> semesters, DateTime day) {
+    for (final semester in semesters) {
+      if (!day.isBefore(semester.firstDay) && !day.isAfter(semester.lastDay)) {
+        return semester;
       }
-    } else {
-      return semesters.isEmpty ? Semester('未刷新') : semesters.first;
     }
+    return semesters.isEmpty ? Semester('未刷新') : semesters.first;
   }
 
   bool get isNearExamWeek {

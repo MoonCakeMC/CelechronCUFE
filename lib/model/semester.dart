@@ -79,6 +79,11 @@ class Semester {
   }
 
   String get shortName {
+    // 新格式 "2026-2027秋" 直接完整展示
+    if (RegExp(r'^\d{4}-\d{4}(春|秋)$').hasMatch(name)) {
+      return name;
+    }
+    // 旧格式 "2026春" 显示为 "26春"
     if (name.length < 10) return name.length > 2 ? name.substring(2) : name;
     return '${name.substring(2, 5)}${name.substring(7, 11)}';
   }
@@ -672,9 +677,18 @@ class Semester {
     };
   }
 
+  /// 旧版本学期名（如 "2026春"）迁移为完整学年格式（"2026-2027春"）；
+  /// 其余格式原样返回。
+  static String _migrateName(String raw) {
+    final match = RegExp(r'^(\d{4})(春|秋)$').firstMatch(raw);
+    if (match == null) return raw;
+    final year = int.parse(match.group(1)!);
+    return '$year-${year + 1}${match.group(2)}';
+  }
+
   factory Semester.fromJson(Map<String, dynamic> json) {
-    final semester =
-        Semester(asString(json['name']) ?? DateTime.now().toIso8601String());
+    final rawName = asString(json['name']) ?? DateTime.now().toIso8601String();
+    final semester = Semester(_migrateName(rawName));
 
     final courses = asStringMap(json['courses']) ?? const {};
     for (final entry in courses.entries) {

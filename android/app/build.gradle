@@ -26,8 +26,8 @@ if (flutterVersionName == null) {
 
 android {
     namespace 'xyz.nosig.celechron'
-    compileSdkVersion flutter.compileSdkVersion
-    ndkVersion flutter.ndkVersion
+    compileSdkVersion 35
+    ndkVersion = "27.0.12077973"
 
     compileOptions {
         coreLibraryDesugaringEnabled true
@@ -47,7 +47,7 @@ android {
         multiDexEnabled true
         applicationId "xyz.nosig.celechron"
         minSdkVersion 28
-        targetSdkVersion flutter.targetSdkVersion
+        targetSdkVersion 35
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
     }

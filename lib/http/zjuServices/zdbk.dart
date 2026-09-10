@@ -15,6 +15,19 @@ import 'package:celechron/services/diagnostic_log_service.dart';
 import 'exceptions.dart';
 import 'response_utils.dart';
 
+/// 中财教务请求参数中的学期编码（以 get_info.py 为准）：
+/// 第一学期(秋)请求 3，第二学期(春)请求 12，其余值原样返回。
+String requestTermParam(String semester) {
+  switch (semester) {
+    case '1':
+      return '3';
+    case '2':
+      return '12';
+    default:
+      return semester;
+  }
+}
+
 /// 本科教务网客户端；统一管理 CAS 业务会话、并发限流与按接口缓存降级。
 class Zdbk {
   Cookie? _jSessionId;
@@ -532,7 +545,10 @@ class Zdbk {
               'application', 'x-www-form-urlencoded',
               charset: 'utf-8');
           final captchaStr = _captcha != null ? '&captcha_value=$_captcha' : '';
-          final bodyBytes = utf8.encode('xnm=$year&xqm=$semester$captchaStr');
+          // 中财教务请求参数的学期编码以 get_info.py 为准：
+          // 第一学期(秋)请求 3，第二学期(春)请求 12。
+          final bodyBytes = utf8.encode(
+              'xnm=$year&xqm=${requestTermParam(semester)}$captchaStr');
           request.headers.contentLength = bodyBytes.length;
           request.add(bodyBytes);
           response = await request.close().timeout(const Duration(seconds: 8),
@@ -582,6 +598,10 @@ class Zdbk {
           final combined = _combineTimetableItems(
               items, asDynamicList(payload['sjkList']) ?? const []);
           final sessions = _parseSessions(combined, context);
+          // 中财长学期分秋(xqm=1)/春(xqm=2)两个学期，按请求参数设置归属
+          for (final session in sessions) {
+            Session.applySemesterHalf(session, semester);
+          }
           _writeCache('zdbk_Timetable$year$semester', jsonEncode(combined));
           return Tuple(null, sessions);
         }
@@ -597,9 +617,14 @@ class Zdbk {
             stackTrace: stackTrace);
         final cached =
             _cachedList('zdbk_Timetable$year$semester', '$context 缓存');
+        // 缓存降级同样按请求学期设置归属
+        final cachedSessions = _parseSessions(cached.data, '$context 缓存');
+        for (final session in cachedSessions) {
+          Session.applySemesterHalf(session, semester);
+        }
         return Tuple(
           _cacheAwareException(exception, cached, context),
-          _parseSessions(cached.data, '$context 缓存'),
+          cachedSessions,
         );
       }
     });
@@ -928,6 +953,10 @@ class Zdbk {
           final combined = _combineTimetableItems(
               items, asDynamicList(payload['sjkList']) ?? const []);
           final sessions = _parseSessions(combined, context);
+          // 中财长学期分秋(xqm=1)/春(xqm=2)两个学期，按请求参数设置归属
+          for (final session in sessions) {
+            Session.applySemesterHalf(session, semester);
+          }
           return Tuple(null, sessions);
         } on Object catch (error, stackTrace) {
           if (error is AuthenticationExpiredException) rethrow;
