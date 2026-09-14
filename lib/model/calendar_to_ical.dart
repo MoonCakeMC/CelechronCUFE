@@ -235,7 +235,7 @@ class CalendarToIcal {
       final fileName =
           'celechron_schedule_${DateTime.now().millisecondsSinceEpoch}.ics';
 
-      final outputFile = await FilePicker.platform.saveFile(
+      final outputFile = await FilePicker.saveFile(
         dialogTitle: '保存课程表',
         fileName: fileName,
         type: FileType.custom,
@@ -270,7 +270,7 @@ class CalendarToIcal {
       final fileName =
           'celechron_${semesterName.replaceAll(' ', '_')}_${DateTime.now().millisecondsSinceEpoch}.ics';
 
-      final outputFile = await FilePicker.platform.saveFile(
+      final outputFile = await FilePicker.saveFile(
         dialogTitle: '保存课程表-$semesterName',
         fileName: fileName,
         type: FileType.custom,
@@ -304,7 +304,7 @@ class CalendarToIcal {
       final fileName =
           'celechron_all_semesters_${DateTime.now().millisecondsSinceEpoch}.ics';
 
-      final outputFile = await FilePicker.platform.saveFile(
+      final outputFile = await FilePicker.saveFile(
         dialogTitle: '保存课程表-完整版',
         fileName: fileName,
         type: FileType.custom,

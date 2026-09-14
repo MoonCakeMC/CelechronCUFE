@@ -76,6 +76,12 @@ class UgrsSpider implements Spider {
     _timeConfigService = TimeConfigService();
     _username = username;
     _password = password;
+    // 教务 Cookie 过期且 SSO 凭据也失效时，由 Zdbk 回调此函数：
+    // 清掉进程内 SSO 缓存后，重新使用账号密码登录统一身份认证。
+    _zdbk.refreshSsoCookie = () async {
+      await ZjuAm.clearCachedSsoCookie(_username);
+      return ZjuAm.getSsoCookie(_httpClient, _username, _password);
+    };
   }
 
   // 初始化或重置 HttpClient
@@ -161,7 +167,8 @@ class UgrsSpider implements Spider {
       final normalized = error.toLowerCase();
       return normalized.contains('未获得 cas ticket') ||
           normalized.contains('登录态失效') ||
-          normalized.contains('统一身份认证凭据无效');
+          normalized.contains('统一身份认证凭据无效') ||
+          normalized.contains('无法获取 jsessionid');
     });
     if (retryOnSsoRejection && ssoRejected) {
       DiagnosticLogService.instance.record(

@@ -40,6 +40,14 @@ class Zdbk {
   int _activeSiteRequests = 0;
   final List<Completer<void>> _siteWaiters = [];
 
+  // SSO 凭据失效时由上层注入的“重新使用账号密码登录 SSO”回调；
+  // 未注入时 SSO 过期只能要求用户手动重新登录。
+  Future<Cookie?> Function()? _refreshSsoCookie;
+
+  set refreshSsoCookie(Future<Cookie?> Function()? callback) {
+    _refreshSsoCookie = callback;
+  }
+
   set db(DatabaseHelper? db) {
     _db = db;
   }
@@ -171,7 +179,38 @@ class Zdbk {
     if (iPlanetDirectoryPro == null) {
       throw LoginExpiredException("教务网会话已过期，请重新登录");
     }
-    await login(httpClient, iPlanetDirectoryPro);
+    // 第一步：复用现有 SSO Cookie 重新换取教务 Cookie（不重新登录 SSO）
+    try {
+      await login(httpClient, iPlanetDirectoryPro);
+      return;
+    } on ExceptionWithMessage catch (error) {
+      // 仅当 CAS 未换到 JSESSIONID（即 SSO 凭据已失效）时，
+      // 才降级到重新使用账号密码登录 SSO。
+      if (!error.toString().contains('无法获取 JSESSIONID')) rethrow;
+      final refreshSso = _refreshSsoCookie;
+      if (refreshSso == null) {
+        throw LoginExpiredException(
+          "教务网会话已过期，请手动重新登录",
+          details: error.toString(),
+          originalError: error,
+        );
+      }
+      DiagnosticLogService.instance.record(
+        level: CelechronLogLevel.warning,
+        module: '教务网',
+        operation: 'reloginFreshSso',
+        retried: true,
+        message: 'SSO 凭据已失效，重新使用账号密码登录统一身份认证',
+      );
+      final freshSso = await refreshSso();
+      if (freshSso == null) {
+        throw LoginExpiredException(
+          "教务网会话已过期，请手动重新登录",
+          details: '重新登录统一身份认证未获得有效凭据',
+        );
+      }
+      await login(httpClient, freshSso);
+    }
   }
 
   Future<T> _withAutoRelogin<T>(HttpClient httpClient,
