@@ -9,7 +9,7 @@ class Fuse {
 
   final bool isBeta = false;
   final version = [1, 3, 0];
-  final build = 1;
+  final build = 2;
   List<int>? remoteVersion;
   int? remoteBuild;
   bool hasNewVersion = false;
@@ -31,33 +31,34 @@ class Fuse {
         return null;
       }
 
-      late String checkUpdateUrl;
-      if (Platform.isAndroid) {
-        checkUpdateUrl =
-            "https://api.celechron.top/checkUpdate?platform=android";
-      } else if (Platform.isIOS) {
-        checkUpdateUrl = "https://api.celechron.top/checkUpdate?platform=ios";
-      } else {
-        checkUpdateUrl =
-            "https://api.celechron.top/checkUpdate?platform=others";
-      }
-
       var request = await _httpClient
-          .getUrl(Uri.parse(checkUpdateUrl))
+          .getUrl(Uri.parse(
+              "https://oss-2.147483648.xyz/celechroncufe/latest_version.json"))
           .timeout(const Duration(seconds: 8));
       var response = await request.close().timeout(const Duration(seconds: 8));
-      var html = await response.transform(utf8.decoder).join();
+      var jsonStr = await response.transform(utf8.decoder).join();
+      var jsonMap = jsonDecode(jsonStr);
 
-      var match = RegExp('[0-9.]+').allMatches(html);
-      remoteVersion = match
-          .elementAt(0)
-          .group(0)!
-          .split('.')
-          .map((e) => int.parse(e))
-          .toList();
-      remoteBuild = int.parse(match.elementAt(1).group(0)!);
+      String? remoteVerStr;
+      if (Platform.isAndroid) {
+        remoteVerStr = jsonMap['android'];
+      } else if (Platform.isIOS) {
+        remoteVerStr = jsonMap['ios'];
+      } else if (Platform.isWindows) {
+        remoteVerStr = jsonMap['windows'];
+      }
 
-      hasNewVersion = _compareVersion(html.contains('beta'));
+      if (remoteVerStr != null) {
+        remoteVerStr = remoteVerStr.trim();
+        var match = RegExp(r'[0-9.]+').firstMatch(remoteVerStr);
+        if (match != null) {
+          remoteVersion =
+              match.group(0)!.split('.').map((e) => int.parse(e)).toList();
+          remoteBuild = 1;
+          hasNewVersion =
+              _compareVersion(remoteVerStr.toLowerCase().contains('beta'));
+        }
+      }
       lastUpdateTime = DateTime.now();
       await _db.setFuse(this);
 

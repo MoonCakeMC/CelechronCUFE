@@ -523,7 +523,7 @@ class OptionPage extends StatelessWidget {
                       },
                     ),
                     CupertinoListTile(
-                      title: const Text('前往项目网站'),
+                      title: const Text('更新软件'),
                       trailing: BackChervonRow(
                         child: Obx(() {
                           if (_optionController.hasNewVersion) {
@@ -544,10 +544,7 @@ class OptionPage extends StatelessWidget {
                         }),
                       ),
                       onTap: () async {
-                        await launchUrlString(
-                          'https://celechron.top',
-                          mode: LaunchMode.externalApplication,
-                        );
+                        await _optionController.updateSoftware(context);
                       },
                     ),
                   ]),

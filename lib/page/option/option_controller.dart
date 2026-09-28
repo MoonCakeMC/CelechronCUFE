@@ -3,6 +3,10 @@ import 'dart:io';
 
 import 'package:get/get.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:open_filex/open_filex.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:workmanager/workmanager.dart';
 
@@ -223,6 +227,114 @@ class OptionController extends GetxController {
   String get celechronVersion => _fuse.value.displayVersion;
 
   bool get hasNewVersion => _fuse.value.hasNewVersion;
+
+  Future<void> updateSoftware(BuildContext context) async {
+    if (!Platform.isAndroid) {
+      return; // 只处理Android自动更新
+    }
+
+    showCupertinoDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const CupertinoAlertDialog(
+        content: Column(
+          children: [
+            CupertinoActivityIndicator(),
+            SizedBox(height: 12),
+            Text('正在检查更新...'),
+          ],
+        ),
+      ),
+    );
+
+    _fuse.value.lastUpdateTime = DateTime(2001);
+    await _fuse.value.checkUpdate();
+    _fuse.refresh();
+
+    // ignore: use_build_context_synchronously
+    Navigator.of(context).pop();
+
+    if (!hasNewVersion) {
+      // ignore: use_build_context_synchronously
+      showCupertinoDialog(
+          context: context,
+          builder: (context) =>
+              CupertinoAlertDialog(title: const Text("已是最新版本"), actions: [
+                CupertinoDialogAction(
+                  child: const Text("确定"),
+                  onPressed: () => Navigator.of(context).pop(),
+                )
+              ]));
+      return;
+    }
+
+    // ignore: use_build_context_synchronously
+    bool? confirm = await showCupertinoDialog<bool>(
+        context: context,
+        builder: (context) => CupertinoAlertDialog(
+                title: const Text("发现新版本"),
+                content: const Text("是否立即下载并安装更新？"),
+                actions: [
+                  CupertinoDialogAction(
+                    child: const Text("取消"),
+                    onPressed: () => Navigator.of(context).pop(false),
+                  ),
+                  CupertinoDialogAction(
+                    child: const Text("更新"),
+                    isDefaultAction: true,
+                    onPressed: () => Navigator.of(context).pop(true),
+                  ),
+                ]));
+
+    if (confirm != true) return;
+
+    // ignore: use_build_context_synchronously
+    showCupertinoDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const CupertinoAlertDialog(
+        content: Column(
+          children: [
+            CupertinoActivityIndicator(),
+            SizedBox(height: 12),
+            Text('正在下载安装包...'),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      final httpClient = HttpClient();
+      final request = await httpClient.getUrl(
+          Uri.parse("https://oss-2.147483648.xyz/celechroncufe/latest.apk"));
+      final response = await request.close();
+      final bytes = await consolidateHttpClientResponseBytes(response);
+
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/latest.apk');
+      await file.writeAsBytes(bytes);
+
+      // ignore: use_build_context_synchronously
+      Navigator.of(context).pop(); // 关闭下载弹窗
+
+      await OpenFilex.open(file.path);
+    } catch (e) {
+      // ignore: use_build_context_synchronously
+      Navigator.of(context).pop();
+      // ignore: use_build_context_synchronously
+      showCupertinoDialog(
+          context: context,
+          builder: (context) => CupertinoAlertDialog(
+                  title: const Text("下载失败"),
+                  content: Text(e.toString()),
+                  actions: [
+                    CupertinoDialogAction(
+                      child: const Text("确定"),
+                      onPressed: () => Navigator.of(context).pop(),
+                    )
+                  ]));
+    }
+  }
 
   Future<void> logout() async {
     await scholar.value.logout();
