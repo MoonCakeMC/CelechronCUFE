@@ -322,6 +322,7 @@ class GrsSpider implements Spider {
     var calendarLive = 0;
     var calendarCache = 0;
     var calendarFallback = 0;
+    var calendarUnpublished = 0;
     // 查课表
     var timetableFetches = <Future<String?>>[];
     var cancelTimetableFetch = false;
@@ -334,15 +335,23 @@ class GrsSpider implements Spider {
       semesterConfigFetches.add(_timeConfigService
           .getConfig(_httpClient, '$queryAcademicYear-1')
           .then((value) {
-        switch (value.item3) {
-          case DataSourceStatus.live:
-            calendarLive++;
-          case DataSourceStatus.cache:
-            calendarCache++;
-          case DataSourceStatus.fallback:
-            calendarFallback++;
-          case DataSourceStatus.unavailable:
-            break;
+        // 未开学学期的配置未发布是预期状态，单独计数，不计入降级。
+        final expectedUnpublished =
+            value.item1 is CalendarConfigUnavailableException &&
+                isFutureSemester('$queryAcademicYear-1', now);
+        if (expectedUnpublished) {
+          calendarUnpublished++;
+        } else {
+          switch (value.item3) {
+            case DataSourceStatus.live:
+              calendarLive++;
+            case DataSourceStatus.cache:
+              calendarCache++;
+            case DataSourceStatus.fallback:
+              calendarFallback++;
+            case DataSourceStatus.unavailable:
+              break;
+          }
         }
         if (value.item2 != null) {
           applyCalendarConfig(
@@ -352,6 +361,16 @@ class GrsSpider implements Spider {
             semesterId: '$queryAcademicYear-1',
             context: '校历（学年学期 $queryAcademicYear-1）',
           );
+        }
+        if (expectedUnpublished) {
+          if (value.item3.isDegraded) {
+            DiagnosticLogService.instance.record(
+              module: '校历',
+              operation: '$queryAcademicYear-1',
+              message: '未来学期校历未发布（${value.item3.label}），不算降级',
+            );
+          }
+          return null;
         }
         if (value.item3.isDegraded) {
           return degradedRefreshText(
@@ -367,15 +386,23 @@ class GrsSpider implements Spider {
       semesterConfigFetches.add(_timeConfigService
           .getConfig(_httpClient, '$queryAcademicYear-2')
           .then((value) {
-        switch (value.item3) {
-          case DataSourceStatus.live:
-            calendarLive++;
-          case DataSourceStatus.cache:
-            calendarCache++;
-          case DataSourceStatus.fallback:
-            calendarFallback++;
-          case DataSourceStatus.unavailable:
-            break;
+        // 未开学学期的配置未发布是预期状态，单独计数，不计入降级。
+        final expectedUnpublished =
+            value.item1 is CalendarConfigUnavailableException &&
+                isFutureSemester('$queryAcademicYear-2', now);
+        if (expectedUnpublished) {
+          calendarUnpublished++;
+        } else {
+          switch (value.item3) {
+            case DataSourceStatus.live:
+              calendarLive++;
+            case DataSourceStatus.cache:
+              calendarCache++;
+            case DataSourceStatus.fallback:
+              calendarFallback++;
+            case DataSourceStatus.unavailable:
+              break;
+          }
         }
         if (value.item2 != null) {
           applyCalendarConfig(
@@ -385,6 +412,16 @@ class GrsSpider implements Spider {
             semesterId: '$queryAcademicYear-2',
             context: '校历（学年学期 $queryAcademicYear-2）',
           );
+        }
+        if (expectedUnpublished) {
+          if (value.item3.isDegraded) {
+            DiagnosticLogService.instance.record(
+              module: '校历',
+              operation: '$queryAcademicYear-2',
+              message: '未来学期校历未发布（${value.item3.label}），不算降级',
+            );
+          }
+          return null;
         }
         if (value.item3.isDegraded) {
           return degradedRefreshText(
@@ -417,7 +454,7 @@ class GrsSpider implements Spider {
       // 本科生课
       Future<String?> handleTimetable(season) async {
         if (cancelTimetableFetch) {
-          return Future.value("已取消");
+          return "已取消";
         }
         try {
           var value = await _fetchWithRetry(
@@ -439,10 +476,9 @@ class GrsSpider implements Spider {
           if (value.item1.toString().contains("验证码")) {
             cancelTimetableFetch = true;
           }
-          return Future.value(value.item1?.toString());
+          return value.item1?.toString();
         } on Object catch (error, stackTrace) {
-          return Future.value(
-              _describeRefreshFailure(error, stackTrace, source: '课表'));
+          return _describeRefreshFailure(error, stackTrace, source: '课表');
         }
       }
 
@@ -537,7 +573,8 @@ class GrsSpider implements Spider {
       if (calendarCache > 0 || calendarFallback > 0) {
         return degradedRefreshText(
           '校历：$calendarLive 个远程成功，$calendarCache 个缓存降级，'
-          '$calendarFallback 个默认配置',
+          '$calendarFallback 个默认配置'
+          '${calendarUnpublished > 0 ? '，$calendarUnpublished 个未发布（未来学期）' : ''}',
         );
       }
       return null;
@@ -677,6 +714,9 @@ class GrsSpider implements Spider {
     if (fetchErrorMessages.every((e) => e == null)) {
       _lastUpdateTime = DateTime.now();
     }
+    final calendarSuccessSummary = calendarUnpublished > 0
+        ? '$calendarLive 个远程成功，$calendarUnpublished 个未发布'
+        : '$calendarLive 个远程成功';
     for (var i = 0; i < fetchErrorMessages.length; i++) {
       if (fetchErrorMessages[i] != null) {
         final message = fetchErrorMessages[i]!;
@@ -691,7 +731,7 @@ class GrsSpider implements Spider {
         fetchSequenceGrs[i],
         fetchErrorMessages[i] == null
             ? fetchSequenceGrs[i] == '校历'
-                ? '$calendarLive 个远程成功'
+                ? calendarSuccessSummary
                 : fetchSequenceGrs[i] == '作业'
                     ? '实时成功，${outTodos.length} 条'
                     : '实时成功'

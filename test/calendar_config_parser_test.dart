@@ -21,6 +21,33 @@ void main() {
     );
   });
 
+  test('autumn semester counts as future only before 1 September', () {
+    expect(isFutureSemester('2026-1', DateTime(2026, 8, 31)), isTrue);
+    expect(isFutureSemester('2026-1', DateTime(2026, 9, 1)), isFalse);
+    expect(isFutureSemester('2026-1', DateTime(2026, 12, 20)), isFalse);
+  });
+
+  test('spring semester counts as future only before 20 February', () {
+    expect(isFutureSemester('2026-2', DateTime(2026, 9, 20)), isTrue);
+    expect(isFutureSemester('2026-2', DateTime(2027, 1, 10)), isTrue);
+    expect(isFutureSemester('2026-2', DateTime(2027, 2, 19)), isTrue);
+    expect(isFutureSemester('2026-2', DateTime(2027, 2, 20)), isFalse);
+    expect(isFutureSemester('2026-2', DateTime(2027, 6, 1)), isFalse);
+  });
+
+  test('past semesters are never future', () {
+    expect(isFutureSemester('2024-1', DateTime(2026, 9, 20)), isFalse);
+    expect(isFutureSemester('2024-2', DateTime(2026, 9, 20)), isFalse);
+    expect(isFutureSemester('2025-2', DateTime(2026, 9, 20)), isFalse);
+  });
+
+  test('invalid semester ids conservatively count as started', () {
+    expect(isFutureSemester('', DateTime(2026, 9, 20)), isFalse);
+    expect(isFutureSemester('2026', DateTime(2026, 9, 20)), isFalse);
+    expect(isFutureSemester('abcd-2', DateTime(2026, 9, 20)), isFalse);
+    expect(isFutureSemester('2026-3', DateTime(2026, 9, 20)), isFalse);
+  });
+
   test('decodeAndValidateCalendarConfig splits startEnd by semesterId', () {
     const raw = '{"sessionTime":['
         '["08:00","08:45"],["08:55","09:40"],["10:00","10:45"],'
