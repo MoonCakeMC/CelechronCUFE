@@ -8,6 +8,8 @@ import 'package:celechron/model/period.dart';
 import 'package:celechron/model/scholar.dart';
 import 'package:celechron/utils/utils.dart';
 import 'package:celechron/pigeon/flow_messenger.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'dart:convert';
 
 class FlowController extends GetxController {
   final scholar = Get.find<Rx<Scholar>>(tag: 'scholar');
@@ -462,6 +464,31 @@ class FlowController extends GetxController {
   }
 
   void refreshWidget() {
+    if (Platform.isAndroid) {
+      // Find next pending or ongoing task/schedule
+      Period? nextPeriod;
+      final now = DateTime.now();
+      for (var p in flowList) {
+        if (p.endTime.isAfter(now)) {
+          nextPeriod = p;
+          break;
+        }
+      }
+      if (nextPeriod != null) {
+        const storage = FlutterSecureStorage();
+        storage.write(key: 'next_schedule_title', value: nextPeriod.summary);
+        final st = '${nextPeriod.startTime.hour.toString().padLeft(2,'0')}:${nextPeriod.startTime.minute.toString().padLeft(2,'0')}';
+        final et = '${nextPeriod.endTime.hour.toString().padLeft(2,'0')}:${nextPeriod.endTime.minute.toString().padLeft(2,'0')}';
+        storage.write(key: 'next_schedule_time', value: '$st - $et');
+        storage.write(key: 'next_schedule_location', value: nextPeriod.location);
+      } else {
+        const storage = FlutterSecureStorage();
+        storage.write(key: 'next_schedule_title', value: '今日无安排');
+        storage.write(key: 'next_schedule_time', value: '');
+        storage.write(key: 'next_schedule_location', value: '');
+      }
+    }
+    
     // 只有 iOS 需要向原生小组件发送数据，其他平台不必构建 DTO
     if (!Platform.isIOS) return;
     List<PeriodDto?>? flowListDto =

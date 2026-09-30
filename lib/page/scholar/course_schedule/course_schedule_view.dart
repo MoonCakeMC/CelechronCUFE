@@ -136,21 +136,19 @@ class CourseSchedulePage extends StatelessWidget {
   }
 
   Widget _courseSchedule(BuildContext context) {
-    const List<String> courseStartTime = [
-      "08:00",
-      "08:50",
-      "10:00",
-      "10:50",
-      "11:40",
-      "13:25",
-      "14:15",
-      "15:05",
-      "16:15",
-      "17:05",
-      "18:50",
-      "19:40",
-      "20:30"
-    ];
+    final semester = _courseScheduleController.semester;
+    List<String> courseStartTime = [];
+    for (int i = 1; i <= 14; i++) {
+      if (semester.sessionToTime.length > i && semester.sessionToTime[i].isNotEmpty) {
+        final d = semester.sessionToTime[i].first;
+        final hr = d.inHours.toString().padLeft(2, '0');
+        final min = (d.inMinutes % 60).toString().padLeft(2, '0');
+        courseStartTime.add("$hr:$min");
+      } else {
+        final fallbacks = ["08:00","08:55","10:00","10:55","11:50","12:45","14:00","14:55","16:00","16:55","17:50","19:20","20:15","21:10"];
+        courseStartTime.add(fallbacks[i - 1]);
+      }
+    }
     return RoundRectangleCard(
       child: Column(
         children: [

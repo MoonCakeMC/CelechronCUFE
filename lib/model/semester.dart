@@ -20,6 +20,7 @@ class Semester {
   // 第几节课 => 时间
   // 例如，对于第六节课，_sessionToTime[6].first = 13:25, _sessionToTime[6].last = 14:10
   // 注意，此处不想让index从0开始，因为不喜欢
+  List<List<Duration>> get sessionToTime => _sessionToTime;
   List<List<Duration>> _sessionToTime = [
     [],
     [],

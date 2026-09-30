@@ -9,7 +9,7 @@ class Fuse {
 
   final bool isBeta = false;
   final version = [1, 3, 1];
-  final build = 1;
+  final build = 3;
   List<int>? remoteVersion;
   int? remoteBuild;
   bool hasNewVersion = false;
@@ -50,11 +50,15 @@ class Fuse {
 
       if (remoteVerStr != null) {
         remoteVerStr = remoteVerStr.trim();
-        var match = RegExp(r'[0-9.]+').firstMatch(remoteVerStr);
+        var match = RegExp(r'([0-9.]+)(?:\+([0-9]+))?').firstMatch(remoteVerStr);
         if (match != null) {
           remoteVersion =
-              match.group(0)!.split('.').map((e) => int.parse(e)).toList();
-          remoteBuild = 1;
+              match.group(1)!.split('.').map((e) => int.parse(e)).toList();
+          if (match.group(2) != null) {
+            remoteBuild = int.parse(match.group(2)!);
+          } else {
+            remoteBuild = 1; // 兜底
+          }
           hasNewVersion =
               _compareVersion(remoteVerStr.toLowerCase().contains('beta'));
         }
