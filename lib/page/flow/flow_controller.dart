@@ -10,6 +10,7 @@ import 'package:celechron/utils/utils.dart';
 import 'package:celechron/pigeon/flow_messenger.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:convert';
+import 'package:flutter/services.dart';
 
 class FlowController extends GetxController {
   final scholar = Get.find<Rx<Scholar>>(tag: 'scholar');
@@ -465,27 +466,29 @@ class FlowController extends GetxController {
 
   void refreshWidget() {
     if (Platform.isAndroid) {
-      // Find next pending or ongoing task/schedule
-      Period? nextPeriod;
       final now = DateTime.now();
-      for (var p in flowList) {
-        if (p.endTime.isAfter(now)) {
-          nextPeriod = p;
-          break;
-        }
-      }
-      if (nextPeriod != null) {
-        const storage = FlutterSecureStorage();
-        storage.write(key: 'next_schedule_title', value: nextPeriod.summary);
-        final st = '${nextPeriod.startTime.hour.toString().padLeft(2,'0')}:${nextPeriod.startTime.minute.toString().padLeft(2,'0')}';
-        final et = '${nextPeriod.endTime.hour.toString().padLeft(2,'0')}:${nextPeriod.endTime.minute.toString().padLeft(2,'0')}';
-        storage.write(key: 'next_schedule_time', value: '$st - $et');
-        storage.write(key: 'next_schedule_location', value: nextPeriod.location);
-      } else {
-        const storage = FlutterSecureStorage();
-        storage.write(key: 'next_schedule_title', value: '今日无安排');
-        storage.write(key: 'next_schedule_time', value: '');
-        storage.write(key: 'next_schedule_location', value: '');
+      final upcoming = flowList.where((p) => p.endTime.isAfter(now)).take(10).toList();
+      final listData = upcoming.map((p) {
+        final st = '${p.startTime.hour.toString().padLeft(2,'0')}:${p.startTime.minute.toString().padLeft(2,'0')}';
+        final et = '${p.endTime.hour.toString().padLeft(2,'0')}:${p.endTime.minute.toString().padLeft(2,'0')}';
+        // 传递 type 用于在 Android 端决定颜色
+        return {
+          'title': p.summary,
+          'time': '$st - $et',
+          'location': p.location,
+          'type': p.type.index,
+          'uid': p.fromUid,
+        };
+      }).toList();
+
+      const storage = FlutterSecureStorage();
+      storage.write(key: 'next_schedule_list', value: jsonEncode(listData));
+      
+      // Notify native widget to update
+      try {
+        const MethodChannel('top.celechron.celechron/scheduleWidget').invokeMethod('update');
+      } catch (e) {
+        // ignore
       }
     }
     

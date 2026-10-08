@@ -27,17 +27,7 @@ if %errorlevel% equ 0 (
     
     echo.
     echo [4/4] Uploading to OSS...
-    REM ========================================================
-    REM Please enter your OSS upload command here (e.g., ossutil, aws-cli)
-    REM References:
-    REM   Config file: latest_version.json
-    REM   APK file: build\app\outputs\flutter-apk\app-release.apk
-    REM 
-    REM Example (Aliyun ossutil):
-    REM ossutil cp latest_version.json oss://your-bucket/celechroncufe/latest_version.json -f
-    REM ossutil cp build\app\outputs\flutter-apk\app-release.apk oss://your-bucket/celechroncufe/latest.apk -f
-    REM ========================================================
-    REM echo Please configure OSS upload command in build_apk.bat
+    python upload_oss.py
     
 ) else (
     echo Build FAILED. Check the logs above.

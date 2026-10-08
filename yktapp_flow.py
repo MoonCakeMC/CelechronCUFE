@@ -19,7 +19,7 @@ CUFE 一卡通（yktapp.cufe.edu.cn）完整访问流程模拟脚本。
 
 用法：
     python yktapp_flow.py <code>
-    python yktapp_flow.py <code> --idserial 2026310926
+    python yktapp_flow.py <code> --idserial 
     python yktapp_flow.py <code> --paycode
 
 其中 <code> 为企业微信 OAuth 一次性授权码：

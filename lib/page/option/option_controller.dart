@@ -303,6 +303,18 @@ class OptionController extends GetxController {
       ),
     );
 
+    final dir = await getTemporaryDirectory();
+    final verStr = _fuse.value.remoteVersion?.join('.') ?? 'unknown';
+    final fileName = 'celechron_${verStr}_${_fuse.value.remoteBuild}.apk';
+    final file = File('${dir.path}/$fileName');
+
+    if (await file.exists()) {
+      // ignore: use_build_context_synchronously
+      Navigator.of(context).pop(); // 关闭等待弹窗
+      await OpenFilex.open(file.path);
+      return;
+    }
+
     try {
       final httpClient = HttpClient();
       final request = await httpClient.getUrl(
@@ -310,8 +322,6 @@ class OptionController extends GetxController {
       final response = await request.close();
       final bytes = await consolidateHttpClientResponseBytes(response);
 
-      final dir = await getTemporaryDirectory();
-      final file = File('${dir.path}/latest.apk');
       await file.writeAsBytes(bytes);
 
       // ignore: use_build_context_synchronously

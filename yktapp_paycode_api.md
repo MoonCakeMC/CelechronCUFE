@@ -73,8 +73,8 @@
     "code": "563801016CA79FCF8BCE9E175A3C9813731...（244 位 hex 付款码）",
     "qrcode": "",
     "barcode": "",
-    "idserial": "2026310926",
-    "realname": "吕思齐",
+    "idserial": "",
+    "realname": "",
     "cardbal": "0.00",
     "defaultpay": "1"
   },

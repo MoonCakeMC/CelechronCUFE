@@ -17,10 +17,10 @@ class MainActivity: FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "top.celechron.celechron/ecardWidget").setMethodCallHandler {
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "top.celechron.celechron/scheduleWidget").setMethodCallHandler {
                 call, result ->
             CoroutineScope(Dispatchers.Main).launch {
-                ECardWidget().updateAll(this@MainActivity)
+                ScheduleWidget().updateAll(this@MainActivity)
             }
         }
     }

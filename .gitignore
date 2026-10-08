@@ -900,3 +900,6 @@ get_sso.py
 local_login_res.html
 encrypt.js
 parse_bjkb.py
+upload_oss.py
+temp*
+patch_*.py
