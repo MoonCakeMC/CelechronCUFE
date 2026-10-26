@@ -3,6 +3,8 @@
    <uses-permission android:name="android.permission.READ_CALENDAR" />
    <uses-permission android:name="android.permission.WRITE_CALENDAR" />
    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+   <!-- 新增：开机后恢复课程超级岛的边界闹钟。 -->
+   <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
    <application android:label="Celechron" android:name="${applicationName}" android:icon="@mipmap/ic_launcher">
         <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTop" android:theme="@style/LaunchTheme" android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode" android:hardwareAccelerated="true" android:windowSoftInputMode="adjustResize">
             <!-- Specifies an Android theme to apply to this Activity as soon as
@@ -34,6 +36,16 @@
            <meta-data
                    android:name="android.appwidget.provider"
                    android:resource="@xml/schedule_widget_info" />
+       </receiver>
+
+       <!-- 新增：课程超级岛边界闹钟接收器。 -->
+       <receiver android:name=".island.ScheduleIslandReceiver"
+                 android:exported="false">
+           <intent-filter>
+               <action android:name="xyz.nosig.celechron.ISLAND_TICK" />
+               <action android:name="android.intent.action.BOOT_COMPLETED" />
+               <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+           </intent-filter>
        </receiver>
 
         <!-- Don't delete the meta-data below.

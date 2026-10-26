@@ -1,0 +1,11 @@
+<resources>
+    <!-- 需要在模块管理器中勾选的作用域。 -->
+    <string-array name="xposed_scope">
+        <!-- SystemUI 主进程。 -->
+        <item>com.android.systemui</item>
+        <!-- HyperOS SystemUI 插件进程，部分版本的通知设置类在这里。 -->
+        <item>miui.systemui.plugin</item>
+        <!-- 小米服务框架，用于焦点通知白名单签名验证。 -->
+        <item>com.xiaomi.xmsf</item>
+    </string-array>
+</resources>
