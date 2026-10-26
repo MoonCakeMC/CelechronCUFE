@@ -1,5 +1,6 @@
 import 'package:celechron/model/semester.dart';
 import 'package:celechron/model/session.dart';
+import 'package:celechron/utils/hidden_course_store.dart';
 import 'package:get/get.dart';
 import 'package:celechron/model/scholar.dart';
 
@@ -26,7 +27,11 @@ class CourseScheduleController extends GetxController {
     hideCourseInfomation = initialHideCourseInfomation.obs;
   }
 
-  List<List<Session>> get sessionsByDayOfWeek => firstOrSecondSemester.value
-      ? _scholar.value.semesters[semesterIndex.value].firstHalfTimetable
-      : _scholar.value.semesters[semesterIndex.value].secondHalfTimetable;
+  // 课表按星期分组。这里在返回前统一剔除用户屏蔽的课程，
+  // 使被屏蔽课程不再与其它课程生成“冲突课程”卡片。
+  List<List<Session>> get sessionsByDayOfWeek => Session.filterHiddenTimetable(
+      firstOrSecondSemester.value
+          ? _scholar.value.semesters[semesterIndex.value].firstHalfTimetable
+          : _scholar.value.semesters[semesterIndex.value].secondHalfTimetable,
+      HiddenCourseStore.keys);
 }

@@ -41,6 +41,21 @@ class Session {
 
   String get semesterId => id!.substring(1, 12);
 
+  /// 课表“屏蔽课程”用的稳定标识：课程号优先，其次教学班 id，最后课程名。
+  /// 必须与 Course.hideKey 保持一致，否则详情页的屏蔽开关无法作用于课表。
+  String get hideKey => kch ?? id ?? name;
+
+  /// 按屏蔽标识过滤整个课表（按星期分组），被屏蔽的课程不会出现在网格中。
+  /// 过滤发生在冲突分组之前，因此可用来解决同一时段的冲突课程。
+  static List<List<Session>> filterHiddenTimetable(
+      List<List<Session>> timetable, Set<String> hiddenKeys) {
+    return timetable
+        .map((day) => day
+            .where((session) => !hiddenKeys.contains(session.hideKey))
+            .toList())
+        .toList();
+  }
+
   static const String dayMap = '零一二三四五六日';
 
   /// 按请求的学期参数设置上半/下半学期归属：

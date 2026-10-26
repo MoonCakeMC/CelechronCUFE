@@ -11,6 +11,7 @@ import 'package:celechron/model/course.dart';
 import 'package:celechron/model/exam.dart';
 import 'package:celechron/model/session.dart';
 import 'package:celechron/model/scholar.dart';
+import 'package:celechron/utils/hidden_course_store.dart';
 
 class CourseDetailPage extends StatelessWidget {
   final _scholar = Get.find<Rx<Scholar>>(tag: 'scholar');
@@ -427,6 +428,67 @@ class CourseDetailPage extends StatelessWidget {
               ),
             ),
           ),
+          // 屏蔽课程开关：屏蔽后该课程不再出现在“日程/学业”的课表网格中，
+          // 可用于解决与其它课程的时间冲突。占位课程（无 id 与 kch）不显示。
+          if (course.id != null || course.kch != null)
+            SliverToBoxAdapter(
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+                child: Column(
+                  children: [
+                    SubSubtitleRow(subtitle: '课表显示'),
+                    RoundRectangleCard(
+                      // 与「课时」「考试」卡片保持一致的阴影/底色；本卡片不可点按，关闭缩放动画
+                      animate: false,
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 8, right: 8),
+                        child: Obx(
+                          () => Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('从课表中屏蔽',
+                                        style: CupertinoTheme.of(context)
+                                            .textTheme
+                                            .textStyle
+                                            .copyWith(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                            )),
+                                    const SizedBox(height: 4),
+                                    // 备注不设 maxLines，随宽度自动换行，避免被截断
+                                    Text('屏蔽后该课程不再显示在课表视图',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: CupertinoTheme.of(context)
+                                              .textTheme
+                                              .textStyle
+                                              .color!
+                                              .withOpacity(0.75),
+                                        )),
+                                  ],
+                                ),
+                              ),
+                              CupertinoSwitch(
+                                value:
+                                    HiddenCourseStore.isHidden(course.hideKey),
+                                onChanged: (value) {
+                                  HiddenCourseStore.setHidden(
+                                      course.hideKey, course.name, value);
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           if (course.sessions.isNotEmpty)
             SliverToBoxAdapter(
               child: Container(

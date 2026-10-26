@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher_string.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'package:celechron/utils/utils.dart';
+import 'package:celechron/utils/hidden_course_store.dart';
 import 'package:celechron/model/option.dart';
 import 'package:celechron/design/cupertino_async_switch.dart';
 
@@ -13,6 +14,7 @@ import 'allow_time_edit_page.dart';
 import 'course_id_mapping_edit_page.dart';
 import 'credits_page.dart';
 import 'diagnostic_log_page.dart';
+import 'hidden_course_page.dart';
 import 'package:get/get.dart';
 import 'custom_license_page.dart';
 import 'login_page.dart';
@@ -152,6 +154,22 @@ class OptionPage extends StatelessWidget {
                                 CupertinoPageRoute(
                                     builder: (context) =>
                                         CourseIdMappingEditPage()));
+                          },
+                        ),
+                        // 已屏蔽课程管理入口：查看/取消在课表中被屏蔽的课程
+                        CupertinoListTile(
+                          title: const Text('已屏蔽课程'),
+                          trailing: BackChervonRow(
+                            child: Text(
+                              '${HiddenCourseStore.all.length} 门',
+                              style: trailingTextStyle,
+                            ),
+                          ),
+                          onTap: () async {
+                            Navigator.of(context, rootNavigator: true).push(
+                                CupertinoPageRoute(
+                                    builder: (context) =>
+                                        const HiddenCoursePage()));
                           },
                         ),
                         CupertinoListTile(

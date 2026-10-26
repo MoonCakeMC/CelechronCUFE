@@ -372,6 +372,7 @@ class FlowController extends GetxController {
     if (sig != _lastFlowSig) {
       _lastFlowSig = sig;
       saveFlowListToDb();
+      refreshWidget();
     }
     _nextWalkAt = _computeNextWalkAt(DateTime.now());
   }
@@ -464,10 +465,10 @@ class FlowController extends GetxController {
         _scholarFlowList.indexWhere((e) => e.endTime.isAfter(DateTime.now()));
   }
 
-  void refreshWidget() {
+  Future<void> refreshWidget() async {
     if (Platform.isAndroid) {
       final now = DateTime.now();
-      final upcoming = flowList.where((p) => p.endTime.isAfter(now)).take(10).toList();
+      final upcoming = flowList.where((p) => p.endTime.isAfter(now)).take(30).toList();
       final listData = upcoming.map((p) {
         final st = '${p.startTime.hour.toString().padLeft(2,'0')}:${p.startTime.minute.toString().padLeft(2,'0')}';
         final et = '${p.endTime.hour.toString().padLeft(2,'0')}:${p.endTime.minute.toString().padLeft(2,'0')}';
@@ -478,15 +479,17 @@ class FlowController extends GetxController {
           'location': p.location,
           'type': p.type.index,
           'uid': p.fromUid,
+          'startMillis': p.startTime.millisecondsSinceEpoch,
+          'endMillis': p.endTime.millisecondsSinceEpoch,
         };
       }).toList();
 
       const storage = FlutterSecureStorage();
-      storage.write(key: 'next_schedule_list', value: jsonEncode(listData));
+      await storage.write(key: 'next_schedule_list', value: jsonEncode(listData));
       
       // Notify native widget to update
       try {
-        const MethodChannel('top.celechron.celechron/scheduleWidget').invokeMethod('update');
+        await const MethodChannel('top.celechron.celechron/scheduleWidget').invokeMethod('update');
       } catch (e) {
         // ignore
       }

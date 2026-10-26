@@ -33,6 +33,8 @@ class Option {
   RxList<CourseIdMap> courseIdMappingList;
   RxBool hideHomeGpa;
   RxBool asyncRefresh;
+  // 在课表中屏蔽的课程：键为课程标识（kch/id/name 之一），值为课程名（供管理页展示）
+  RxMap<String, String> hiddenCourses;
 
   Option({
     required this.workTime,
@@ -45,5 +47,6 @@ class Option {
     required this.courseIdMappingList,
     required this.hideHomeGpa,
     required this.asyncRefresh,
+    required this.hiddenCourses,
   });
 }

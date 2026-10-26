@@ -72,6 +72,7 @@ class DatabaseHelper {
   final String kCourseIdMappingList = 'courseIdMappingList';
   final String kHideHomeGpa = 'hideHomeGpa';
   final String kAsyncRefresh = 'asyncRefresh';
+  final String kHiddenCourses = 'hiddenCourses';
 
   Option getOption() {
     return Option(
@@ -85,6 +86,7 @@ class DatabaseHelper {
       courseIdMappingList: getCourseIdMappingList().obs,
       hideHomeGpa: getHideHomeGpa().obs,
       asyncRefresh: getAsyncRefresh().obs,
+      hiddenCourses: getHiddenCourses().obs,
     );
   }
 
@@ -189,6 +191,20 @@ class DatabaseHelper {
 
   Future<void> setAsyncRefresh(bool asyncRefresh) async {
     await optionsBox.put(kAsyncRefresh, asyncRefresh);
+  }
+
+  // 在课表中屏蔽的课程（键为课程标识，值为课程名）
+  Map<String, String> getHiddenCourses() {
+    final raw = optionsBox.get(kHiddenCourses);
+    if (raw == null) {
+      optionsBox.put(kHiddenCourses, <String, String>{});
+      return {};
+    }
+    return Map<String, String>.from(raw);
+  }
+
+  Future<void> setHiddenCourses(Map<String, String> hiddenCourses) async {
+    await optionsBox.put(kHiddenCourses, hiddenCourses);
   }
 
   List<CourseIdMap> getCourseIdMappingList() {

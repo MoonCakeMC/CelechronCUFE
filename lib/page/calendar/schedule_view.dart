@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:celechron/utils/tuple.dart';
+import 'package:celechron/utils/hidden_course_store.dart';
 import 'package:celechron/model/session.dart';
 import 'package:celechron/design/round_rectangle_card.dart';
 import 'package:celechron/page/scholar/course_schedule/course_card.dart';
@@ -139,9 +140,13 @@ class ScheduleView extends StatelessWidget {
                 }
 
                 final isFirstHalf = controller.isFirstHalfSemester(semester);
-                final sessionsByDayOfWeek = isFirstHalf
+                final rawTimetable = isFirstHalf
                     ? semester.firstHalfTimetable
                     : semester.secondHalfTimetable;
+                // 去掉用户屏蔽的课程。过滤发生在冲突分组之前，
+                // 使被屏蔽课程不再与其它课程生成“冲突课程”卡片。
+                final sessionsByDayOfWeek =
+                    Session.filterHiddenTimetable(rawTimetable, HiddenCourseStore.keys);
 
                 return Row(
                   children: [

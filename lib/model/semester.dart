@@ -217,24 +217,29 @@ class Semester {
     });
   }
 
-  double get firstHalfSessionCount {
-    return _sessions
-        .where((e) => e.firstHalf && e.confirmed && e.showOnTimetable)
-        .fold(
-            0.0,
-            (p, e) =>
-                p +
-                (e.time.length) * ((e.oddWeek ? 1 : 0) + (e.evenWeek ? 1 : 0)));
-  }
+  double get firstHalfSessionCount => _countSessionsFootprint(true).toDouble();
 
-  double get secondHalfSessionCount {
-    return _sessions
-        .where((e) => e.secondHalf && e.confirmed && e.showOnTimetable)
-        .fold(
-            0.0,
-            (p, e) =>
-                p +
-                (e.time.length) * ((e.oddWeek ? 1 : 0) + (e.evenWeek ? 1 : 0)));
+  double get secondHalfSessionCount => _countSessionsFootprint(false).toDouble();
+
+  int _countSessionsFootprint(bool firstHalf) {
+    final slots = <int>{};
+    for (var s in _sessions) {
+      if (firstHalf ? !s.firstHalf : !s.secondHalf) continue;
+      if (!s.confirmed || !s.showOnTimetable) continue;
+
+      for (var t in s.time) {
+        if (s.customRepeat) {
+          // 对自定义周次的课程，将每一周映射为对应的单双周 slot
+          for (var week in s.customRepeatWeeks) {
+            slots.add(s.dayOfWeek * 1000 + t * 10 + (week % 2 == 0 ? 2 : 1));
+          }
+        } else {
+          if (s.oddWeek) slots.add(s.dayOfWeek * 1000 + t * 10 + 1);
+          if (s.evenWeek) slots.add(s.dayOfWeek * 1000 + t * 10 + 2);
+        }
+      }
+    }
+    return slots.length;
   }
 
   List<Period>? _periodsCache;

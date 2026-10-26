@@ -22,6 +22,10 @@ class Course {
   bool? online = false; // only used for grs
   String? type; // GRS-specific course type (e.g., "专业学位课")
 
+  /// 课表“屏蔽课程”用的稳定标识：课程号优先，其次教学班 id，最后课程名。
+  /// 必须与 [Session.hideKey] 保持一致，否则详情页的屏蔽开关无法作用于课表。
+  String get hideKey => kch ?? id ?? name;
+
   String get realId {
     // 优先展示课程号 kch；课表来源有标准 jxbmc 时展示带学年的课号形式
     if (id == null) return kch ?? '未知';
