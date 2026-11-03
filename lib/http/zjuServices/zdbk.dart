@@ -36,6 +36,8 @@ class Zdbk {
   String? _captcha;
   DatabaseHelper? _db;
   Future<bool>? _loginFuture;
+  // SSO 凭据刷新单飞：多个教务请求同时发现凭据失效时只真正重新认证一次。
+  Future<Cookie?>? _refreshSsoFuture;
   int _sessionGeneration = 0;
   int _activeSiteRequests = 0;
   final List<Completer<void>> _siteWaiters = [];
@@ -79,18 +81,18 @@ class Zdbk {
     _captcha = null;
     _jSessionId = null;
     _route = null;
-    
+
     Map<String, Cookie> accumulatedCookies = {};
-    String currentUrl = "https://authserver.cufe.edu.cn/authserver/login?service=https%3A%2F%2Fxuanke.cufe.edu.cn%2Fsso%2Fjziotlogin";
+    String currentUrl =
+        "https://authserver.cufe.edu.cn/authserver/login?service=https%3A%2F%2Fxuanke.cufe.edu.cn%2Fsso%2Fjziotlogin";
     int redirectCount = 0;
-    
+
     while (redirectCount < 15) {
-      var request = await httpClient
-          .getUrl(Uri.parse(currentUrl))
-          .timeout(const Duration(seconds: 8),
-              onTimeout: () => throw requestTimeout());
+      var request = await httpClient.getUrl(Uri.parse(currentUrl)).timeout(
+          const Duration(seconds: 8),
+          onTimeout: () => throw requestTimeout());
       request.followRedirects = false;
-      
+
       // Inject accumulated cookies
       for (var cookie in accumulatedCookies.values) {
         request.cookies.add(cookie);
@@ -102,7 +104,7 @@ class Zdbk {
 
       var response = await request.close().timeout(const Duration(seconds: 8),
           onTimeout: () => throw requestTimeout());
-          
+
       // Save new cookies
       for (var cookie in response.cookies) {
         accumulatedCookies[cookie.name] = cookie;
@@ -111,7 +113,7 @@ class Zdbk {
       if (response.statusCode >= 300 && response.statusCode < 400) {
         var nextLocation = response.headers.value(HttpHeaders.locationHeader);
         if (nextLocation == null) break;
-        
+
         // CUFE sends http:// redirects from WebVPN ticketlogin, force upgrade to https to avoid firewall drop
         if (nextLocation.startsWith("http://")) {
           nextLocation = nextLocation.replaceFirst("http://", "https://");
@@ -133,12 +135,24 @@ class Zdbk {
         _route = accumulatedCookies['route'];
       }
     } else {
-      throw ExceptionWithMessage(
-          "教务网登录无法获取 JSESSIONID；重定向最终停留在: $currentUrl");
+      throw ExceptionWithMessage("教务网登录无法获取 JSESSIONID；重定向最终停留在: $currentUrl");
     }
 
     _sessionGeneration++;
     return true;
+  }
+
+  // 包装上层注入的 SSO 刷新回调，保证并发失效时只执行一次密码登录。
+  Future<Cookie?> _refreshSsoOnce(Future<Cookie?> Function() refreshSso) {
+    final pending = _refreshSsoFuture;
+    if (pending != null) return pending;
+    final future = refreshSso();
+    _refreshSsoFuture = future;
+    return future.whenComplete(() {
+      if (identical(_refreshSsoFuture, future)) {
+        _refreshSsoFuture = null;
+      }
+    });
   }
 
   void logout() {
@@ -146,6 +160,7 @@ class Zdbk {
     _route = null;
     _iPlanetDirectoryPro = null;
     _captcha = null;
+    _refreshSsoFuture = null;
   }
 
   void _validateResponse(HttpClientResponse response, String responseText,
@@ -202,7 +217,8 @@ class Zdbk {
         retried: true,
         message: 'SSO 凭据已失效，重新使用账号密码登录统一身份认证',
       );
-      final freshSso = await refreshSso();
+      // 用单飞包装，避免多个并发教务请求各自清缓存并重复密码登录。
+      final freshSso = await _refreshSsoOnce(refreshSso);
       if (freshSso == null) {
         throw LoginExpiredException(
           "教务网会话已过期，请手动重新登录",
@@ -228,10 +244,14 @@ class Zdbk {
       var reloginAttempted = false;
       try {
         if (_jSessionId == null || _route == null) {
-          reloginAttempted = true;
-          await _relogin(httpClient);
-          relogged = true;
-          generation = _sessionGeneration;
+          // 并发请求可能已经完成登录：generation 变化时直接复用新会话，
+          // 避免每个并发请求都各自再执行一次 CAS/SSO 登录。
+          if (_sessionGeneration == generation) {
+            reloginAttempted = true;
+            await _relogin(httpClient);
+            relogged = true;
+            generation = _sessionGeneration;
+          }
         }
         return await requestFactory(relogged, i > 0);
       } on AuthenticationExpiredException catch (error) {
@@ -362,15 +382,13 @@ class Zdbk {
     final sessions = <Session>[];
     for (var index = 0; index < items.length; index++) {
       final item = asStringMap(items[index]);
-      if (item == null ||
-          asString(item['sfyjskc']) == '1') {
+      if (item == null || asString(item['sfyjskc']) == '1') {
         continue;
       }
       try {
         // 缓存合并时给其他课程（实践课）打的标记；这些课程无时间地点，仅进课程列表
         if (asBool(item['_sjkCourse']) == true) {
-          final qtkcgs =
-              asString(item['qtkcgs']) ?? asString(item['sjkcgs']);
+          final qtkcgs = asString(item['qtkcgs']) ?? asString(item['sjkcgs']);
           if (qtkcgs == null || qtkcgs.trim().isEmpty) continue;
           sessions.add(Session.fromZdbkSjkList(qtkcgs));
         } else {
@@ -562,8 +580,8 @@ class Zdbk {
     return await _withAutoRelogin(httpClient, (relogged, retried) async {
       late HttpClientRequest request;
       late HttpClientResponse response;
-      final uri =
-          Uri.parse("https://xuanke.cufe.edu.cn/jwglxt/kbcx/xskbcx_cxXsKb.html?gnmkdm=N2151");
+      final uri = Uri.parse(
+          "https://xuanke.cufe.edu.cn/jwglxt/kbcx/xskbcx_cxXsKb.html?gnmkdm=N2151");
 
       try {
         for (var i = 0; i < 3; i++) {
@@ -586,8 +604,8 @@ class Zdbk {
           final captchaStr = _captcha != null ? '&captcha_value=$_captcha' : '';
           // 中财教务请求参数的学期编码以 get_info.py 为准：
           // 第一学期(秋)请求 3，第二学期(春)请求 12。
-          final bodyBytes = utf8.encode(
-              'xnm=$year&xqm=${requestTermParam(semester)}$captchaStr');
+          final bodyBytes = utf8
+              .encode('xnm=$year&xqm=${requestTermParam(semester)}$captchaStr');
           request.headers.contentLength = bodyBytes.length;
           request.add(bodyBytes);
           response = await request.close().timeout(const Duration(seconds: 8),
@@ -939,7 +957,8 @@ class Zdbk {
       String bh) async {
     return await _withSitePermit(() async {
       await _initClassTimetableModule(httpClient);
-      return await _withAutoReloginUnlocked(httpClient, (relogged, retried) async {
+      return await _withAutoReloginUnlocked(httpClient,
+          (relogged, retried) async {
         late HttpClientRequest request;
         late HttpClientResponse response;
         final uri = Uri.parse(
@@ -962,7 +981,7 @@ class Zdbk {
           request.headers.contentType = ContentType(
               'application', 'x-www-form-urlencoded',
               charset: 'utf-8');
-          
+
           final bodyBytes = utf8.encode(
               'xnm=$year&xqm=$semester&xnmc=$year&xqmmc=1&xqh_id=2&njdm_id=$njdmId&zyh_id=$zyhId&bh_id=$bhId&tjkbzdm=1&tjkbzxsdm=0&zymc=&jgmc=&njmc=2026&bj=&xkrs=29&bh=$bh&zxszjjs=false&akcxqjchb=false&kzlx=ck&sfcxxqh=1');
           request.headers.contentLength = bodyBytes.length;
@@ -970,7 +989,8 @@ class Zdbk {
           response = await request.close().timeout(const Duration(seconds: 8),
               onTimeout: () => throw requestTimeout());
 
-          var responseText = await readResponseBody(response, context: '班级课表接口');
+          var responseText =
+              await readResponseBody(response, context: '班级课表接口');
           print("\n=== RAW CLASS TIMETABLE JSON ===");
           print(responseText);
           print("==========================\n");
@@ -1022,7 +1042,8 @@ class Zdbk {
       String bjmc) async {
     return await _withSitePermit(() async {
       await _initClassTimetableModule(httpClient);
-      return await _withAutoReloginUnlocked(httpClient, (relogged, retried) async {
+      return await _withAutoReloginUnlocked(httpClient,
+          (relogged, retried) async {
         late HttpClientRequest request;
         late HttpClientResponse response;
         final uri = Uri.parse(
@@ -1045,7 +1066,7 @@ class Zdbk {
           request.headers.contentType = ContentType(
               'application', 'x-www-form-urlencoded',
               charset: 'utf-8');
-          
+
           // 发送专业、年级等信息，请求班级列表
           // 注：xqh_id 可能不是必须的，如果不传遇到问题可加入 xqh_id=1 或 2
           final bodyBytes = utf8.encode(
@@ -1055,7 +1076,8 @@ class Zdbk {
           response = await request.close().timeout(const Duration(seconds: 8),
               onTimeout: () => throw requestTimeout());
 
-          var responseText = await readResponseBody(response, context: '班级列表接口');
+          var responseText =
+              await readResponseBody(response, context: '班级列表接口');
           final context = '班级列表接口（专业 $zyhId）';
           _validateResponse(response, responseText,
               context: context,
@@ -1065,15 +1087,16 @@ class Zdbk {
 
           final payload = decodeJsonMap(responseText,
               context: '$context：HTTP ${response.statusCode}');
-          
+
           final items = asDynamicList(payload['items']);
           if (items == null) {
-             return Tuple(null, null); // 没查到班级
+            return Tuple(null, null); // 没查到班级
           }
 
           for (var item in items) {
             if (item is Map) {
-              final String? classTitle = item['bjmc']?.toString() ?? item['bj']?.toString();
+              final String? classTitle =
+                  item['bjmc']?.toString() ?? item['bj']?.toString();
               if (classTitle != null && classTitle == bjmc) {
                 final bhId = item['bh_id']?.toString();
                 final bh = item['bh']?.toString();
@@ -1118,8 +1141,9 @@ class Zdbk {
         request.cookies.add(_jSessionId!);
         request.cookies.add(_route!);
         request.followRedirects = false;
-        
-        final response = await request.close().timeout(const Duration(seconds: 8),
+
+        final response = await request.close().timeout(
+            const Duration(seconds: 8),
             onTimeout: () => throw requestTimeout());
         await readResponseBody(response, context: '唤醒班级课表模块');
       } catch (_) {

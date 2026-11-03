@@ -150,6 +150,42 @@ class Semester {
       return null;
     }
 
+    // 刷新合并时需要覆盖旧考试字段（尤其是座位号），而不是遇到重复就跳过。
+    // 原实现：重复考试直接跳过，导致旧版本从 row_id 解析的错误座位号无法被刷新替换。
+    // final duplicate = existing.exams.any((current) => ...);
+    // if (!duplicate) existing.exams.add(exam);
+    void mergeExam(List<Exam> target, Exam incomingExam) {
+      Exam? matched;
+      // 优先按 id + 类型 + 开始时间匹配同一场考试。
+      for (final current in target) {
+        if (current.id == incomingExam.id &&
+            current.type == incomingExam.type &&
+            current.time.isNotEmpty &&
+            incomingExam.time.isNotEmpty &&
+            current.time.first == incomingExam.time.first) {
+          matched = current;
+          break;
+        }
+      }
+      // 时间发生调整时退化为 id + 类型；只有唯一匹配才覆盖，避免误改多场考试。
+      if (matched == null) {
+        final sameType = target
+            .where((current) =>
+                current.id == incomingExam.id &&
+                current.type == incomingExam.type)
+            .toList();
+        if (sameType.length == 1) {
+          matched = sameType.single;
+        }
+      }
+      if (matched != null) {
+        // 用新解析结果覆盖旧考试，座位号即使为 null 也会清除旧错误值。
+        matched.overwriteFrom(incomingExam);
+      } else {
+        target.add(incomingExam);
+      }
+    }
+
     for (final entry in incoming.courses.entries) {
       final existing = matchingCourse(entry.value);
       if (existing == null) {
@@ -163,13 +199,7 @@ class Semester {
         existing.completeGrade(entry.value.grade!);
       }
       for (final exam in entry.value.exams) {
-        final duplicate = existing.exams.any((current) =>
-            current.id == exam.id &&
-            current.type == exam.type &&
-            current.time.isNotEmpty &&
-            exam.time.isNotEmpty &&
-            current.time.first == exam.time.first);
-        if (!duplicate) existing.exams.add(exam);
+        mergeExam(existing.exams, exam);
       }
     }
     for (final session in incoming.sessions) {
@@ -186,13 +216,7 @@ class Semester {
       if (!duplicate) _grades.add(grade);
     }
     for (final exam in incoming.exams) {
-      final duplicate = _exams.any((existing) =>
-          existing.id == exam.id &&
-          existing.type == exam.type &&
-          existing.time.isNotEmpty &&
-          exam.time.isNotEmpty &&
-          existing.time.first == exam.time.first);
-      if (!duplicate) _exams.add(exam);
+      mergeExam(_exams, exam);
     }
     calculateGPA();
   }
@@ -219,7 +243,8 @@ class Semester {
 
   double get firstHalfSessionCount => _countSessionsFootprint(true).toDouble();
 
-  double get secondHalfSessionCount => _countSessionsFootprint(false).toDouble();
+  double get secondHalfSessionCount =>
+      _countSessionsFootprint(false).toDouble();
 
   int _countSessionsFootprint(bool firstHalf) {
     final slots = <int>{};
@@ -540,9 +565,8 @@ class Semester {
       _courses[key]!.completeGrade(grade);
     } else if (grade.kch == null) {
       // kch 缺失时尝试关联唯一同名课程，避免同名课程被拆成两条
-      final sameName = _courses.values
-          .where((course) => course.name == grade.name)
-          .toList();
+      final sameName =
+          _courses.values.where((course) => course.name == grade.name).toList();
       if (sameName.length == 1) {
         sameName.first.completeGrade(grade);
         return;
@@ -816,8 +840,8 @@ class Semester {
     }
     if (calendar.length == 2) semester._dayOfWeekToDays = calendar;
     // 旧数据未持久化校历可用标记：按恢复的日期数组非空推断
-    semester._calendarAvailable = semester._dayOfWeekToDays
-        .any((half) => half.any((oddEven) => oddEven.any((days) => days.isNotEmpty)));
+    semester._calendarAvailable = semester._dayOfWeekToDays.any((half) =>
+        half.any((oddEven) => oddEven.any((days) => days.isNotEmpty)));
 
     semester._holidays = {};
     for (final entry in (asStringMap(json['holidays']) ?? const {}).entries) {

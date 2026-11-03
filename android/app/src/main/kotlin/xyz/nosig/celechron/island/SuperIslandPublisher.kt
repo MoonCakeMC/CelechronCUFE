@@ -52,6 +52,9 @@ class SuperIslandPublisher(context: Context) {
         // 岛标题使用的强调色（Celechron 蓝色）。
         private const val ACCENT_COLOR = "#4F6EF7"
 
+        // 进度条未完成部分的颜色。
+        private const val PROGRESS_TRACK_COLOR = "#C7D2FE"
+
         // 更新时不自动弹开岛。
         private const val ISLAND_UPDATE_NO_FLOAT = "miui.island.updateNoFloat"
         private const val ISLAND_FIRST_FLOAT = "miui.island.firstFloat"
@@ -113,6 +116,18 @@ class SuperIslandPublisher(context: Context) {
         runCatching {
             notificationManager.cancel(NOTIFICATION_ID)
         }
+    }
+
+    /**
+     * 当前超级岛通知是否仍然存在。
+     *
+     * 重启手机、重启 SystemUI 或系统清理通知后，通知会消失，
+     * 但本地保存的内容签名仍然存在，需要据此重新发布。
+     */
+    fun isPublished(): Boolean {
+        return runCatching {
+            notificationManager.activeNotifications.any { it.id == NOTIFICATION_ID }
+        }.getOrDefault(false)
     }
 
     /**
@@ -210,6 +225,9 @@ class SuperIslandPublisher(context: Context) {
             .put("islandFirstFloat", false)
             // 通知展开后的基础信息。
             .put("baseInfo", buildBaseInfo(state))
+            // 展开态进度条：使用带标题的 multiProgressInfo，
+            // 让“离结束还有 / 开始还有”显示在进度条附近。
+            .put("multiProgressInfo", buildMultiProgress(state))
             // 岛的大/小区域布局。
             .put("param_island", buildIslandParam(state, remainMillis))
             // 超时时间（分钟），最多 12 小时。
@@ -246,32 +264,54 @@ class SuperIslandPublisher(context: Context) {
         .put("colorTitleDark", ACCENT_COLOR)
 
     /**
+     * 展开态进度条。
+     *
+     * 使用 MultiProgressInfo 的 title 把倒计时放到进度条附近，
+     * 而不是放在 baseInfo 顶部的小字里。
+     */
+    private fun buildMultiProgress(state: IslandState): JSONObject = JSONObject()
+        .put(
+            "title",
+            "${state.countdownLabel} ${state.countdownValue}".trim()
+        )
+        .put("progress", state.progress)
+        .put("points", 0)
+        .put("color", ACCENT_COLOR)
+
+    /**
      * 岛的布局参数。
      */
     private fun buildIslandParam(state: IslandState, remainMillis: Long): JSONObject {
+        // 系统圆环进度：百分比由系统显示在圆环内部。
+        val progressInfo = JSONObject()
+            .put("progress", state.progress)
+            .put("colorReach", ACCENT_COLOR)
+            .put("colorUnReach", PROGRESS_TRACK_COLOR)
+            .put("isCCW", true)
+
+        // 大岛：左侧不显示应用 logo，只保留课程名/地点；右侧系统圆环与剩余时间。
         val bigIslandArea = JSONObject()
-            // 左侧：应用图标 + 课程名/地点。
             .put(
                 "imageTextInfoLeft",
                 JSONObject()
                     .put("type", 1)
-                    .put("picInfo", pictureInfo(PRIMARY_IMAGE_KEY))
                     .put("textInfo", summaryText(state.title, state.location))
             )
-            // 右侧：状态时间文本。
             .put(
-                "textInfo",
-                summaryText(state.timeText, state.shortText)
+                "progressTextInfo",
+                JSONObject()
+                    .put("progressInfo", progressInfo)
+                    // textInfo 位于圆环左侧，仅显示“分钟:秒”剩余时间。
+                    .put("textInfo", summaryText(state.collapsedValue, ""))
             )
 
-        // 小岛：图标 + 简短时间。
+        // 小岛：使用系统圆环进度，圆环内部由系统显示百分比。
         val smallIslandArea = JSONObject()
             .put(
-                "imageTextInfoRight",
+                "combinePicInfo",
                 JSONObject()
-                    .put("type", 6)
-                    .put("picInfo", pictureInfo(PRIMARY_IMAGE_KEY, 4))
-                    .put("textInfo", summaryText(state.shortText, ""))
+                    .put("picInfo", pictureInfo(PRIMARY_IMAGE_KEY))
+                    .put("progressInfo", progressInfo)
             )
 
         return JSONObject()
@@ -318,12 +358,16 @@ class SuperIslandPublisher(context: Context) {
  * 岛当前要展示的状态。
  *
  * @param title 课程名
- * @param subtitle 状态描述（正在上课 / 即将开始）
- * @param timeText 右侧时间文本
+ * @param subtitle 状态描述（时间范围）
+ * @param timeText 时间范围文本
  * @param location 上课地点
- * @param shortText 小岛文本
+ * @param shortText 小岛简短文本
  * @param startMillis 课程开始时间
  * @param endMillis 课程结束时间
+ * @param progress 课程进度百分比
+ * @param countdownLabel 展开态倒计时标题
+ * @param countdownValue 展开态倒计时值（HH:mm:ss）
+ * @param collapsedValue 折叠态剩余时间（分钟:秒，小时折算进分钟）
  */
 data class IslandState(
     val title: String,
@@ -332,5 +376,9 @@ data class IslandState(
     val location: String,
     val shortText: String,
     val startMillis: Long,
-    val endMillis: Long
+    val endMillis: Long,
+    val progress: Int = 0,
+    val countdownLabel: String = "",
+    val countdownValue: String = "",
+    val collapsedValue: String = ""
 )

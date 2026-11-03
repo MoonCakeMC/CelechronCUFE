@@ -34,6 +34,12 @@ class GrsSpider implements Spider {
   late TimeConfigService _timeConfigService;
   DateTime _lastUpdateTime = DateTime(0);
   Future<List<String?>>? _reloginFuture;
+  // 进程内账号级 SSO 凭据：登录成功后保存，后续 login() 优先复用，避免重复密码认证。
+  Cookie? _ssoCookie;
+  // SSO 密码登录单飞：并发调用共享同一个 Future，避免同时发起多次账号密码登录。
+  Future<Cookie?>? _ssoLoginFuture;
+  // 强制重新登录单飞：子站拒绝 SSO 时只允许一个调用真正清缓存并重新认证。
+  Future<Cookie?>? _ssoReauthFuture;
   int _loginGeneration = 0;
   static const _retryableFetchErrors = <String>[
     "iplanetdirectorypro无效",
@@ -65,6 +71,92 @@ class GrsSpider implements Spider {
     _timeConfigService = TimeConfigService();
     _username = username;
     _password = password;
+    // 研究生链路也会用 Zdbk 抓取本科课程；其 SSO 失效时统一走单飞重新认证。
+    _zdbk.refreshSsoCookie = () => _reauthenticateSso(reason: '教务网拒绝了统一身份认证凭据');
+  }
+
+  // 账号级 SSO 会话标识：同一账号在进程内共享，不再绑定到某个 HttpClient 实例。
+  String get _ssoScope => 'grs:$_username';
+
+  // 获取可用 SSO 凭据：优先复用内存中的账号级 Cookie，未命中才执行密码登录。
+  Future<Cookie?> _ensureSsoCookie({
+    required String reason,
+    HttpClient? httpClient,
+  }) async {
+    // 若已有强制重新认证在途，直接等待其结果，避免同时发起两次密码登录。
+    final reauth = _ssoReauthFuture;
+    if (reauth != null) {
+      return await reauth;
+    }
+    final cached = _ssoCookie;
+    if (cached != null) {
+      // 已有账号级凭据时直接复用，避免反复走账号密码认证。
+      return cached;
+    }
+    final pending = _ssoLoginFuture;
+    if (pending != null) {
+      // 并发的首次登录共享同一个密码认证过程。
+      return await pending;
+    }
+    final future = ZjuAm.getSsoCookie(
+      httpClient ?? _httpClient,
+      _username,
+      _password,
+      sessionScope: _ssoScope,
+      reason: reason,
+    );
+    _ssoLoginFuture = future;
+    try {
+      final cookie = await future;
+      if (cookie != null) {
+        // 登录成功后缓存到 Spider，后续登录周期直接复用。
+        _ssoCookie = cookie;
+      }
+      return cookie;
+    } finally {
+      if (identical(_ssoLoginFuture, future)) {
+        _ssoLoginFuture = null;
+      }
+    }
+  }
+
+  // 强制重新建立 SSO 会话：仅在服务端明确拒绝当前凭据时调用。
+  Future<Cookie?> _reauthenticateSso({required String reason}) async {
+    final pending = _ssoReauthFuture;
+    if (pending != null) {
+      // 并发请求同时发现 SSO 失效时，只允许一个真正执行密码登录。
+      return await pending;
+    }
+    // 如果首次密码登录正在途，其结果本来就是新凭据，直接复用避免重复认证。
+    final loginInFlight = _ssoLoginFuture;
+    if (loginInFlight != null) {
+      final cookie = await loginInFlight;
+      if (cookie != null) return cookie;
+    }
+    final future = () async {
+      // 先让账号级缓存失效，再由 ZjuAm 重新走密码登录。
+      _ssoCookie = null;
+      await ZjuAm.clearCachedSsoCookie(_username);
+      final cookie = await ZjuAm.getSsoCookie(
+        _httpClient,
+        _username,
+        _password,
+        sessionScope: _ssoScope,
+        reason: reason,
+      );
+      if (cookie != null) {
+        _ssoCookie = cookie;
+      }
+      return cookie;
+    }();
+    _ssoReauthFuture = future;
+    try {
+      return await future;
+    } finally {
+      if (identical(_ssoReauthFuture, future)) {
+        _ssoReauthFuture = null;
+      }
+    }
   }
 
   HttpClient _createHttpClient() {
@@ -99,15 +191,32 @@ class GrsSpider implements Spider {
     }
   }
 
-  Future<List<String?>> _doLogin({bool retryOnSsoRejection = true}) async {
+  Future<List<String?>> _doLogin({
+    bool retryOnSsoRejection = true,
+    // 子站拒绝本轮 SSO 后，是否强制重新建立账号级 SSO 会话。
+    bool forceFreshSso = false,
+  }) async {
     // 候选客户端完成各子站登录后再替换，避免失败登录污染旧会话。
     final previousClient = _httpClient;
     final candidateClient = _createHttpClient();
 
+    // 记录获取凭据前的密码登录次数：
+    // 次数发生变化说明本轮凭据来自新的密码登录，子站拒绝时直接复用；
+    // 未变化说明复用了内存或加密存储中的旧凭据，必要时强制刷新一次。
+    final passwordLoginCountBefore = ZjuAm.passwordLoginCount(_ssoScope);
+
     var loginErrorMessages = <String?>[null];
-    final candidateSsoCookie =
-        await ZjuAm.getSsoCookie(candidateClient, _username, _password)
-            .catchError((Object error, StackTrace stackTrace) {
+    // 原实现每次都新建客户端并调用 ZjuAm.getSsoCookie，导致缓存永不命中。
+    // final candidateSsoCookie =
+    //     await ZjuAm.getSsoCookie(candidateClient, _username, _password)
+    //         .catchError(...);
+    final candidateSsoCookie = await (forceFreshSso
+            ? _reauthenticateSso(reason: '子站拒绝了本轮统一身份认证，强制重新登录')
+            : _ensureSsoCookie(
+                reason: '研究生登录',
+                httpClient: candidateClient,
+              ))
+        .catchError((Object error, StackTrace stackTrace) {
       loginErrorMessages[0] = exceptionFrom(
         error,
         context: "无法登录统一身份认证",
@@ -119,6 +228,9 @@ class GrsSpider implements Spider {
       candidateClient.close(force: true);
       return loginErrorMessages;
     }
+    // 本轮是否真的执行过新的密码登录；用于决定子站拒绝后是否强制刷新 SSO。
+    final performedPasswordLogin =
+        ZjuAm.passwordLoginCount(_ssoScope) > passwordLoginCountBefore;
     Future<String?> captureLogin(Future<dynamic> future, String serviceName,
         {bool ignoreError = false}) async {
       try {
@@ -160,11 +272,20 @@ class GrsSpider implements Spider {
         level: CelechronLogLevel.warning,
         module: '研究生登录',
         operation: 'retryFreshSso',
-        message: '子站拒绝了本轮 SSO，使用全新密码会话重试一次',
+        message: performedPasswordLogin
+            ? '子站拒绝了本轮 SSO，复用刚获得的凭据重试一次'
+            : '子站拒绝了缓存的 SSO，强制重新登录后重试一次',
         retried: true,
       );
       candidateClient.close(force: true);
-      return _doLogin(retryOnSsoRejection: false);
+      // 原实现：直接 _doLogin(retryOnSsoRejection: false)，会再次执行完整密码登录。
+      // return _doLogin(retryOnSsoRejection: false);
+      // 现改为仅在复用了旧缓存时才强制刷新 SSO；本轮新建的凭据直接复用，
+      // 保证一次 login() 最多只发生一次账号密码认证。
+      return _doLogin(
+        retryOnSsoRejection: false,
+        forceFreshSso: !performedPasswordLogin,
+      );
     }
 
     if (serviceErrors.every((error) => error == null)) {
@@ -181,6 +302,10 @@ class GrsSpider implements Spider {
     unawaited(ZjuAm.clearCachedSsoCookie(_username));
     _username = "";
     _password = "";
+    // 退出时同步清空账号级 SSO 缓存与登录单飞状态，避免下一次登录误用旧凭据。
+    _ssoCookie = null;
+    _ssoLoginFuture = null;
+    _ssoReauthFuture = null;
     try {
       _httpClient.close(force: true);
     } on Object catch (error, stackTrace) {
@@ -307,14 +432,10 @@ class GrsSpider implements Spider {
     Map<String, int> semesterIndexMap = <String, int>{};
     // 名称使用完整学年（如 2026-2027秋），且每个学年秋学期在前、春学期在后
     for (var i = 9, j = 0; i >= 0; i--, j++) {
-      semesterIndexMap.addEntries(
-          [MapEntry('${yearEnroll + i}-1', j * 2)]);
-      semesterIndexMap.addEntries(
-          [MapEntry('${yearEnroll + i}-2', j * 2 + 1)]);
-      outSemesters
-          .add(Semester('${yearEnroll + i}-${yearEnroll + i + 1}秋'));
-      outSemesters
-          .add(Semester('${yearEnroll + i}-${yearEnroll + i + 1}春'));
+      semesterIndexMap.addEntries([MapEntry('${yearEnroll + i}-1', j * 2)]);
+      semesterIndexMap.addEntries([MapEntry('${yearEnroll + i}-2', j * 2 + 1)]);
+      outSemesters.add(Semester('${yearEnroll + i}-${yearEnroll + i + 1}秋'));
+      outSemesters.add(Semester('${yearEnroll + i}-${yearEnroll + i + 1}春'));
     }
 
     // 查校历（存在CDN上，JSON格式的，内含学期起止日期、单日时间表、放假调休等信息）

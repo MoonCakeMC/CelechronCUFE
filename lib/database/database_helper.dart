@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:get/get.dart';
 import 'package:hive/hive.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -7,6 +9,7 @@ import 'package:celechron/worker/fuse.dart';
 import 'package:celechron/model/scholar.dart';
 import 'package:celechron/model/period.dart';
 import 'package:celechron/model/option.dart';
+import 'package:celechron/services/diagnostic_log_service.dart';
 import 'package:celechron/utils/utils.dart';
 import 'adapters/duration_adapter.dart';
 import 'adapters/scholar_adapter.dart';
@@ -44,20 +47,27 @@ class DatabaseHelper {
     fuseBox = await Hive.openBox(dbFuse);
     customGpaBox = await Hive.openBox(dbCustomGpa);
     secureStorage = const FlutterSecureStorage();
-    // Migrate all items without groupID
-    var secureStorageItems = await secureStorage.readAll(
-        iOptions: const IOSOptions(
-            accessibility: KeychainAccessibility.first_unlock,
-            accountName: 'Celechron'));
-    await Future.forEach(secureStorageItems.entries, (e) async {
-      await secureStorage.delete(
-          key: e.key,
+    // 原实现每次启动都会 readAll 后逐项删除并重写全部安全存储：
+    // var secureStorageItems = await secureStorage.readAll(...);
+    // await Future.forEach(secureStorageItems.entries, (e) async { ... });
+    // 该迁移只为处理 iOS Keychain groupId 变更；Android 的 iOptions 会被忽略，
+    // 重复删除重写只会放大被中断时丢失 username/password 的风险。
+    if (Platform.isIOS) {
+      // Migrate all items without groupID
+      var secureStorageItems = await secureStorage.readAll(
           iOptions: const IOSOptions(
               accessibility: KeychainAccessibility.first_unlock,
               accountName: 'Celechron'));
-      await secureStorage.write(
-          key: e.key, value: e.value, iOptions: secureStorageIOSOptions);
-    });
+      await Future.forEach(secureStorageItems.entries, (e) async {
+        await secureStorage.delete(
+            key: e.key,
+            iOptions: const IOSOptions(
+                accessibility: KeychainAccessibility.first_unlock,
+                accountName: 'Celechron'));
+        await secureStorage.write(
+            key: e.key, value: e.value, iOptions: secureStorageIOSOptions);
+      });
+    }
   }
 
   // Options
@@ -283,21 +293,44 @@ class DatabaseHelper {
       })
     ]);
     scholar.db = this;
+    // Hive 中的 Scholar JSON 不保存账号密码，isLogan 不能单独作为登录依据。
+    // 安全存储里没有可用凭据时，必须降级为未登录，避免设置页显示“已登录: null”
+    // 以及刷新时用空账号触发“未登录”。
+    final hasCredentials = scholar.username != null &&
+        scholar.username!.isNotEmpty &&
+        scholar.password != null;
+    if (scholar.isLogan != hasCredentials) {
+      DiagnosticLogService.instance.record(
+        level: CelechronLogLevel.warning,
+        module: '登录状态',
+        operation: 'restore',
+        message: hasCredentials ? '已从安全存储恢复账号凭据' : '安全存储中缺少账号凭据，已重置为未登录',
+      );
+    }
+    scholar.isLogan = hasCredentials;
     return scholar;
   }
 
   Future<void> setScholar(Scholar scholar) async {
-    await Future.wait([
-      scholarBox.put('user', scholar),
-      secureStorage.write(
-          key: kUsername,
-          value: scholar.username,
-          iOptions: secureStorageIOSOptions),
-      secureStorage.write(
-          key: kPassword,
-          value: scholar.password,
-          iOptions: secureStorageIOSOptions)
-    ]);
+    // 原实现无条件写入 username/password；flutter_secure_storage 在 value 为 null
+    // 时会删除对应 key，因此空值写回会把已有凭据彻底删掉。
+    // await Future.wait([
+    //   scholarBox.put('user', scholar),
+    //   secureStorage.write(key: kUsername, value: scholar.username, ...),
+    //   secureStorage.write(key: kPassword, value: scholar.password, ...)
+    // ]);
+    final writes = <Future<void>>[scholarBox.put('user', scholar)];
+    final username = scholar.username;
+    final password = scholar.password;
+    if (username != null && username.isNotEmpty) {
+      writes.add(secureStorage.write(
+          key: kUsername, value: username, iOptions: secureStorageIOSOptions));
+    }
+    if (password != null) {
+      writes.add(secureStorage.write(
+          key: kPassword, value: password, iOptions: secureStorageIOSOptions));
+    }
+    await Future.wait(writes);
   }
 
   Future<void> removeScholar() async {

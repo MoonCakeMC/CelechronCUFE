@@ -32,6 +32,12 @@ class ScheduleIslandReceiver : BroadcastReceiver() {
 
         Thread {
             try {
+                // 开机或应用更新后通知一定已经消失，清除旧签名，强制重新发布。
+                if (action == Intent.ACTION_BOOT_COMPLETED ||
+                    action == Intent.ACTION_MY_PACKAGE_REPLACED
+                ) {
+                    ScheduleIslandCoordinator.invalidate(appContext)
+                }
                 // 重新读取课程并刷新岛。
                 ScheduleIslandCoordinator.refreshNow(appContext)
             } finally {

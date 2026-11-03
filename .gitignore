@@ -890,6 +890,11 @@ DerivedData/
 !/packages/flutter_tools/test/data/dart_dependencies_test/**/.packages
 
 test/*
+# 例外：保留统一身份认证、登录状态与考试座位号回归测试，避免 test/* 规则忽略新增用例。
+!test/cufe_sso_session_test.dart
+!test/login_state_restore_test.dart
+!test/exam_seat_test.dart
+!test/semester_exam_merge_test.dart
 *.har
 *.saz
 test_*

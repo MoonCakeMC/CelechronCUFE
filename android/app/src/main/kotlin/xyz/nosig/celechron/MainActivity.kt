@@ -18,6 +18,12 @@ class MainActivity: FlutterActivity() {
         ScheduleIslandCoordinator.refresh(this)
     }
 
+    override fun onResume() {
+        super.onResume()
+        // 新增：每次回到前台都检查一次，通知被系统清理后可重新发布。
+        ScheduleIslandCoordinator.refresh(this)
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "top.celechron.celechron/scheduleWidget").setMethodCallHandler {

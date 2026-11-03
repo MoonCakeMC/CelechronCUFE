@@ -153,7 +153,8 @@ class Scholar {
     var loginErrorMessage = await _spider!.login();
     if (loginErrorMessage.every((e) => e == null)) {
       isLogan = true;
-      _db?.setScholar(this);
+      // 登录成功后必须等待凭据落盘，避免刚登录就关闭 App 导致 username/password 未保存。
+      await _db?.setScholar(this);
     }
     return loginErrorMessage;
   }
